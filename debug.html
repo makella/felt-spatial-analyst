@@ -217,7 +217,7 @@
             ...feature,
             geometry: {
               type: 'Point',
-              coordinates: [lng, lat]
+              coordinates: [Number(lng), Number(lat)]  // Ensure numbers
             }
           });
           stats.extracted++;
@@ -270,15 +270,27 @@
           }
           
           try {
-            const featurePoint = turf.point(feature.geometry.coordinates);
+            // Ensure coordinates are numbers
+            const coords = feature.geometry.coordinates;
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            
+            if (isNaN(lng) || isNaN(lat)) {
+              log(`  Invalid coords: [${coords[0]}, ${coords[1]}]`, 'warn');
+              errors++;
+              continue;
+            }
+            
+            const featurePoint = turf.point([lng, lat]);
             const distance = turf.distance(centerPoint, featurePoint, { units: 'kilometers' });
             withDistances.push({
               id: feature.id,
-              name: feature.properties?.place || feature.properties?.title || feature.id?.substring(0, 8),
-              coords: feature.geometry.coordinates,
+              name: feature.properties?.place || feature.properties?.title || feature.properties?.acq_date || String(feature.id),
+              coords: [lng, lat],
               distance: distance
             });
           } catch (e) {
+            if (errors < 3) log(`  Error: ${e.message}`, 'error');
             errors++;
           }
         }
@@ -337,7 +349,16 @@
           }
           
           try {
-            const point = turf.point(feature.geometry.coordinates);
+            const coords = feature.geometry.coordinates;
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            
+            if (isNaN(lng) || isNaN(lat)) {
+              errors++;
+              continue;
+            }
+            
+            const point = turf.point([lng, lat]);
             if (turf.booleanPointInPolygon(point, buffer)) {
               inside++;
               featuresInBuffer.push(feature);
@@ -345,6 +366,7 @@
               outside++;
             }
           } catch (e) {
+            if (errors < 3) log(`  Error: ${e.message}`, 'error');
             errors++;
           }
         }
@@ -357,7 +379,7 @@
         if (featuresInBuffer.length > 0) {
           log(`\n--- Sample features in buffer ---`, 'info');
           featuresInBuffer.slice(0, 5).forEach((f, i) => {
-            const name = f.properties?.place || f.properties?.title || f.id?.substring(0, 8);
+            const name = f.properties?.place || f.properties?.title || f.properties?.acq_date || String(f.id);
             log(`${i+1}. ${name}`);
           });
         }
