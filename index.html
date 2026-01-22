@@ -1711,12 +1711,39 @@
       if (!state.felt) return [];
       
       try {
-        // Try to get features using getFeatures method
-        const result = await state.felt.getFeatures({ layerId });
-        const features = result?.features || [];
+        // Paginate through all features
+        let allFeatures = [];
+        let nextPage = null;
+        let pageCount = 0;
+        const maxPages = 50; // Safety limit to prevent infinite loops
+        
+        do {
+          const params = { layerId, pageSize: 100 }; // Request larger pages
+          if (nextPage) {
+            params.pagination = nextPage;
+          }
+          
+          const result = await state.felt.getFeatures(params);
+          const features = result?.features || [];
+          allFeatures = allFeatures.concat(features);
+          nextPage = result?.nextPage || null;
+          pageCount++;
+          
+          // Log progress for large datasets
+          if (pageCount % 5 === 0) {
+            console.log(`Fetched ${allFeatures.length} features so far (page ${pageCount})...`);
+          }
+          
+        } while (nextPage && pageCount < maxPages);
+        
+        if (pageCount >= maxPages) {
+          console.warn(`Stopped at ${maxPages} pages (${allFeatures.length} features). Dataset may be truncated.`);
+        }
+        
+        console.log(`Total features fetched: ${allFeatures.length}`);
         
         // Normalize features - extract geometry from properties if needed
-        return features.map(f => normalizeFeatureGeometry(f));
+        return allFeatures.map(f => normalizeFeatureGeometry(f));
       } catch (e) {
         console.log('getFeatures not available, trying alternative:', e);
         return [];
