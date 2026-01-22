@@ -1,2366 +1,472 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+  <title>Felt Spatial Analyst v2</title>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Felt Explorer + Analysis</title>
-  <meta name="description" content="Explore Felt maps with spatial analysis powered by Turf.js">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
   <style>
-    :root {
-      --felt-purple: #6366f1;
-      --felt-purple-light: #818cf8;
-      --felt-purple-dark: #4f46e5;
-      --felt-violet: #7c3aed;
-      --green: #10b981;
-      --blue: #3b82f6;
-      --orange: #f59e0b;
-      --red: #ef4444;
-      --pink: #ec4899;
-      --cyan: #06b6d4;
-      
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --bg-card: #1a1a24;
-      --bg-card-hover: #22222e;
-      --bg-elevated: #252530;
-      
-      --text-primary: #f4f4f5;
-      --text-secondary: #a1a1aa;
-      --text-muted: #71717a;
-      
-      --border: #27272a;
-      --border-light: #3f3f46;
-      
-      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
-      --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
-      
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 16px;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.6;
-      min-height: 100vh;
-    }
-
-    .bg-gradient {
-      position: fixed;
-      inset: 0;
-      background: 
-        radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 100%, rgba(124, 58, 237, 0.1) 0%, transparent 50%),
-        var(--bg-primary);
-      z-index: -1;
-    }
-
-    /* Header */
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(10, 10, 15, 0.8);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header-content {
-      max-width: 1600px;
-      margin: 0 auto;
-      padding: 16px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: var(--text-primary);
-    }
-
-    .logo-icon {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, var(--felt-purple), var(--felt-violet));
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-    }
-
-    .logo-text {
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px 20px;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: none;
-      text-decoration: none;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--felt-purple), var(--felt-violet));
-      color: white;
-      box-shadow: var(--shadow-md), 0 0 20px rgba(99, 102, 241, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg), 0 0 30px rgba(99, 102, 241, 0.4);
-    }
-
-    .btn-secondary {
-      background: var(--bg-card);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-light);
-    }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--text-secondary);
-      padding: 8px 12px;
-    }
-
-    .btn-ghost:hover {
-      color: var(--text-primary);
-      background: var(--bg-card);
-    }
-
-    .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
-
-    /* Main Layout */
-    .app-layout {
-      display: grid;
-      grid-template-columns: 320px 1fr 340px;
-      height: calc(100vh - 73px);
-      max-width: 1600px;
-      margin: 0 auto;
-    }
-
-    @media (max-width: 1200px) {
-      .app-layout { grid-template-columns: 280px 1fr; }
-      .sidebar-right { display: none; }
-    }
-
-    @media (max-width: 768px) {
-      .app-layout { grid-template-columns: 1fr; }
-      .sidebar-left { display: none; }
-    }
-
-    /* Sidebars */
-    .sidebar-left, .sidebar-right {
-      background: var(--bg-secondary);
-      border-right: 1px solid var(--border);
-      overflow-y: auto;
-      padding: 16px;
-    }
-
-    .sidebar-right {
-      border-right: none;
-      border-left: 1px solid var(--border);
-    }
-
-    .sidebar-section { margin-bottom: 24px; }
-
-    .sidebar-title {
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      padding: 0 4px;
-    }
-
-    /* Map List */
-    .map-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .map-list-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px;
-      background: var(--bg-card);
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: all 0.2s;
-      border: 1px solid transparent;
-    }
-
-    .map-list-item:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-light);
-    }
-
-    .map-list-item.active {
-      border-color: var(--felt-purple);
-      background: rgba(99, 102, 241, 0.1);
-    }
-
-    .map-list-thumb {
-      width: 48px;
-      height: 36px;
-      border-radius: var(--radius-sm);
-      background: var(--bg-elevated);
-      overflow: hidden;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-    }
-
-    .map-list-thumb img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .map-list-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .map-list-name {
-      font-size: 0.875rem;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .map-list-meta {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-    }
-
-    /* Map Container */
-    .map-container {
-      position: relative;
-      background: var(--bg-primary);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .map-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .map-toolbar-title {
-      font-size: 1rem;
-      font-weight: 600;
-    }
-
-    .map-toolbar-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .map-frame {
-      flex: 1;
-      position: relative;
-    }
-
-    #map-embed-container {
-      width: 100%;
-      height: 100%;
-    }
-
-    #map-embed-container iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    .map-placeholder {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-muted);
-      text-align: center;
-      padding: 48px;
-    }
-
-    .map-placeholder-icon { font-size: 4rem; margin-bottom: 16px; }
-    .map-placeholder h3 { font-size: 1.25rem; color: var(--text-primary); margin-bottom: 8px; }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .stat-card {
-      background: var(--bg-card);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      text-align: center;
-    }
-
-    .stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--felt-purple-light);
-    }
-
-    .stat-label {
-      font-size: 0.65rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Layer List */
-    .layer-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .layer-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: var(--bg-card);
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .layer-item:hover { background: var(--bg-card-hover); }
-    .layer-item.hidden { opacity: 0.5; }
-
-    .layer-color {
-      width: 10px;
-      height: 10px;
-      border-radius: 3px;
-      flex-shrink: 0;
-    }
-
-    .layer-name {
-      flex: 1;
-      font-size: 0.8rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .layer-toggle {
-      width: 18px;
-      height: 18px;
-      border-radius: 4px;
-      background: var(--bg-elevated);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.6rem;
-      color: var(--text-muted);
-    }
-
-    .layer-item:not(.hidden) .layer-toggle {
-      background: var(--green);
-      color: white;
-    }
-
-    /* Viewport Info */
-    .viewport-info {
-      background: var(--bg-card);
-      border-radius: var(--radius-md);
-      padding: 12px;
-    }
-
-    .viewport-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      font-size: 0.8rem;
-    }
-
-    .viewport-row:not(:last-child) { border-bottom: 1px solid var(--border); }
-    .viewport-label { color: var(--text-muted); }
-    .viewport-value { font-family: 'SF Mono', Monaco, monospace; color: var(--cyan); }
-
-    /* Feature Panel */
-    .feature-panel {
-      background: var(--bg-card);
-      border-radius: var(--radius-md);
-      overflow: hidden;
-    }
-
-    .feature-header {
-      padding: 12px;
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(236, 72, 153, 0.1));
-      border-bottom: 1px solid var(--border);
-    }
-
-    .feature-title { font-size: 0.9rem; font-weight: 600; }
-    .feature-subtitle { font-size: 0.7rem; color: var(--text-muted); }
-
-    .feature-props { max-height: 250px; overflow-y: auto; }
-
-    .feature-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 12px;
-      font-size: 0.8rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .feature-row:last-child { border-bottom: none; }
-    .feature-key { color: var(--text-muted); flex-shrink: 0; }
-    .feature-val { text-align: right; color: var(--text-primary); max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
-    .feature-actions { padding: 12px; display: flex; gap: 8px; }
-
-    /* Quick Actions */
-    .actions-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .action-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      padding: 12px 8px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      color: var(--text-secondary);
-      font-size: 0.7rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .action-btn:hover {
-      border-color: var(--felt-purple);
-      color: var(--text-primary);
-      background: var(--bg-card-hover);
-    }
-
-    .action-btn span { font-size: 1.25rem; }
-
-    /* Loading & Empty */
-    .loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 32px;
-      color: var(--text-muted);
-    }
-
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--border);
-      border-top-color: var(--felt-purple);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 12px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .empty-state {
-      text-align: center;
-      padding: 24px;
-      color: var(--text-muted);
-    }
-
-    .empty-icon { font-size: 2rem; margin-bottom: 8px; }
-
-    /* SDK Status */
-    .sdk-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 100px;
-      font-size: 0.7rem;
-      font-weight: 500;
-    }
-
-    .sdk-status.connected { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .sdk-status.disconnected { background: rgba(239, 68, 68, 0.15); color: var(--red); }
-    .sdk-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .fade-in { animation: fadeIn 0.3s ease-out; }
-
-    /* Analysis Panel Styles */
-    .analysis-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .analysis-label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-      display: block;
-    }
-
-    .analysis-select {
-      width: 100%;
-      padding: 8px 12px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-
-    .analysis-select:focus {
-      outline: none;
-      border-color: var(--felt-purple);
-    }
-
-    .analysis-tools {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .analysis-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      padding: 12px 8px;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      font-size: 0.75rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .analysis-btn span {
-      font-size: 1.25rem;
-    }
-
-    .analysis-btn:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-light);
-      color: var(--text-primary);
-    }
-
-    .analysis-btn.active {
-      background: linear-gradient(135deg, var(--felt-purple), var(--felt-violet));
-      border-color: var(--felt-purple);
-      color: white;
-    }
-
-    .analysis-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .analysis-options {
-      padding: 12px;
-      background: var(--bg-primary);
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border);
-    }
-
-    .analysis-options label {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-
-    .analysis-options input[type="number"],
-    .analysis-options input[type="range"] {
-      width: 80px;
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      font-size: 0.8rem;
-    }
-
-    .analysis-options input[type="range"] {
-      width: 120px;
-    }
-
-    .analysis-instructions {
-      padding: 12px;
-      background: rgba(99, 102, 241, 0.1);
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      border-radius: var(--radius-md);
-      color: var(--felt-purple-light);
-      font-size: 0.8rem;
-      text-align: center;
-    }
-
-    .analysis-instructions.warning {
-      background: rgba(245, 158, 11, 0.1);
-      border-color: rgba(245, 158, 11, 0.3);
-      color: var(--orange);
-    }
-
-    .analysis-results {
-      background: var(--bg-primary);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .result-summary {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .result-stat {
-      background: var(--bg-card);
-      padding: 10px;
-      border-radius: var(--radius-sm);
-      text-align: center;
-    }
-
-    .result-stat-value {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--felt-purple-light);
-    }
-
-    .result-stat-label {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .result-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .result-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 10px;
-      background: var(--bg-card);
-      border-radius: var(--radius-sm);
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .result-item:hover {
-      background: var(--bg-card-hover);
-    }
-
-    .result-item-name {
-      color: var(--text-primary);
-      font-weight: 500;
-    }
-
-    .result-item-value {
-      color: var(--text-muted);
-    }
-
-    .result-breakdown {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-
-    .result-breakdown-title {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-
-    .breakdown-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .breakdown-label {
-      flex: 1;
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .breakdown-bar-container {
-      flex: 2;
-      height: 8px;
-      background: var(--bg-card);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .breakdown-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--felt-purple), var(--felt-violet));
-      border-radius: 4px;
-      transition: width 0.3s ease-out;
-    }
-
-    .breakdown-count {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      min-width: 30px;
-      text-align: right;
-    }
-
-    /* Crosshair overlay for analysis */
-    .map-crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      z-index: 100;
-      display: none;
-    }
-
-    .map-crosshair.active {
-      display: block;
-    }
-
-    .crosshair-circle {
-      width: 40px;
-      height: 40px;
-      border: 2px solid var(--felt-purple);
-      border-radius: 50%;
-      position: relative;
-      background: rgba(99, 102, 241, 0.1);
-      box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
-    }
-
-    .crosshair-circle::before,
-    .crosshair-circle::after {
-      content: '';
-      position: absolute;
-      background: var(--felt-purple);
-    }
-
-    .crosshair-circle::before {
-      width: 2px;
-      height: 12px;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .crosshair-circle::after {
-      width: 12px;
-      height: 2px;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .crosshair-label {
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      margin-top: 8px;
-      background: var(--felt-purple);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      white-space: nowrap;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+    
+    .container { display: flex; height: 100vh; }
+    
+    .sidebar { width: 380px; background: #1e293b; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+    .sidebar h1 { font-size: 1.25rem; color: #f8fafc; display: flex; align-items: center; gap: 8px; }
+    
+    .map-container { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+    
+    .card { background: #334155; border-radius: 12px; padding: 16px; }
+    .card h3 { font-size: 0.875rem; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    input, select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #f8fafc; font-size: 0.875rem; }
+    input:focus, select:focus { outline: none; border-color: #6366f1; }
+    
+    button { padding: 10px 16px; border-radius: 8px; border: none; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-primary:disabled { background: #475569; cursor: not-allowed; }
+    .btn-secondary { background: #475569; color: #e2e8f0; }
+    .btn-secondary:hover { background: #64748b; }
+    
+    .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tool-btn { padding: 12px; text-align: center; border-radius: 8px; background: #475569; border: 2px solid transparent; cursor: pointer; transition: all 0.15s; }
+    .tool-btn:hover { background: #64748b; }
+    .tool-btn.active { border-color: #6366f1; background: #4338ca; }
+    .tool-btn .icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .tool-btn .label { font-size: 0.75rem; color: #cbd5e1; }
+    
+    .param-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    .param-row label { font-size: 0.75rem; color: #94a3b8; min-width: 60px; }
+    .param-row input { flex: 1; }
+    
+    .results { background: #1e293b; border-radius: 12px; padding: 16px; max-height: 300px; overflow-y: auto; }
+    .results h4 { color: #6366f1; margin-bottom: 12px; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .stat-box { background: #334155; padding: 12px; border-radius: 8px; text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+    .stat-label { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+    
+    .feature-list { font-size: 0.875rem; }
+    .feature-item { padding: 8px 0; border-bottom: 1px solid #475569; }
+    .feature-item:last-child { border-bottom: none; }
+    
+    .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 1000; }
+    .crosshair-circle { width: 40px; height: 40px; border: 3px solid #6366f1; border-radius: 50%; position: relative; }
+    .crosshair-circle::before, .crosshair-circle::after { content: ''; position: absolute; background: #6366f1; }
+    .crosshair-circle::before { width: 2px; height: 12px; left: 50%; top: -8px; transform: translateX(-50%); }
+    .crosshair-circle::after { width: 12px; height: 2px; top: 50%; left: -8px; transform: translateY(-50%); }
+    .crosshair-label { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); background: #6366f1; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; white-space: nowrap; }
+    
+    .status { padding: 8px 12px; background: #1e293b; border-radius: 8px; font-size: 0.75rem; color: #94a3b8; }
+    .status.loading { color: #fbbf24; }
+    .status.success { color: #4ade80; }
+    .status.error { color: #f87171; }
+    
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div class="bg-gradient"></div>
-
-  <header>
-    <div class="header-content">
-      <a href="#" class="logo">
-        <div class="logo-icon">🧪</div>
-        <span class="logo-text">Felt Spatial Analyst</span>
-      </a>
-      <div class="header-actions">
-        <div class="sdk-status disconnected" id="sdk-status">
-          <div class="sdk-status-dot"></div>
-          <span>SDK Disconnected</span>
+  <div class="container">
+    <div class="sidebar">
+      <h1>🧪 Felt Spatial Analyst</h1>
+      
+      <div class="card">
+        <h3>Load Map</h3>
+        <input type="text" id="map-url" placeholder="Paste Felt map URL...">
+        <button class="btn-primary" style="width:100%; margin-top:8px;" onclick="loadMap()">Load Map</button>
+      </div>
+      
+      <div class="card" id="layer-card" class="hidden">
+        <h3>Select Layer</h3>
+        <select id="layer-select">
+          <option value="">Choose a layer...</option>
+        </select>
+        <div id="layer-info" style="margin-top:8px; font-size:0.75rem; color:#94a3b8;"></div>
+      </div>
+      
+      <div class="card" id="tools-card" class="hidden">
+        <h3>Analysis Tools</h3>
+        <div class="tool-grid">
+          <div class="tool-btn" data-tool="buffer" onclick="selectTool('buffer')">
+            <div class="icon">⭕</div>
+            <div class="label">Buffer Query</div>
+          </div>
+          <div class="tool-btn" data-tool="stats" onclick="selectTool('stats')">
+            <div class="icon">📊</div>
+            <div class="label">Layer Stats</div>
+          </div>
+          <div class="tool-btn" data-tool="categories" onclick="selectTool('categories')">
+            <div class="icon">📋</div>
+            <div class="label">Categories</div>
+          </div>
+          <div class="tool-btn" data-tool="histogram" onclick="selectTool('histogram')">
+            <div class="icon">📈</div>
+            <div class="label">Histogram</div>
+          </div>
         </div>
-        <a href="https://felt.com" target="_blank" class="btn btn-ghost">Visit Felt</a>
-        <a href="https://felt.com/maps" target="_blank" class="btn btn-primary">Create Map</a>
+        
+        <div id="tool-params" class="hidden" style="margin-top:16px;"></div>
+        
+        <button class="btn-primary" style="width:100%; margin-top:12px;" id="run-btn" onclick="runAnalysis()">Run Analysis</button>
+      </div>
+      
+      <div id="results" class="results hidden"></div>
+      
+      <div id="status" class="status">Ready</div>
+    </div>
+    
+    <div class="map-container">
+      <div id="map"></div>
+      <div class="crosshair hidden" id="crosshair">
+        <div class="crosshair-circle"></div>
+        <div class="crosshair-label">Analysis Center</div>
       </div>
     </div>
-  </header>
-
-  <div class="app-layout">
-    <!-- Left Sidebar: Map List -->
-    <aside class="sidebar-left">
-      <div class="sidebar-section">
-        <div class="sidebar-title">Load a Map</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-          <input type="text" id="map-url-input" placeholder="Paste Felt map URL or ID" 
-            style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.875rem;">
-          <button id="load-map-btn" class="btn btn-primary" style="padding: 10px 16px;">Load</button>
-        </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-title">Recent Maps</div>
-        <div id="map-list" class="map-list">
-          <div class="empty-state">
-            <div class="empty-icon">🗺️</div>
-            <div>Paste a Felt map URL above to get started</div>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Main Map Area -->
-    <main class="map-container">
-      <div class="map-toolbar" id="map-toolbar" style="display: none;">
-        <div class="map-toolbar-title" id="current-map-title">Select a map</div>
-        <div class="map-toolbar-actions">
-          <button class="btn btn-ghost btn-sm" id="refresh-btn">🔄 Refresh</button>
-          <a id="open-felt-btn" href="#" target="_blank" class="btn btn-secondary btn-sm">Open in Felt</a>
-        </div>
-      </div>
-      
-      <div class="map-placeholder" id="map-placeholder">
-        <div class="map-placeholder-icon">🗺️</div>
-        <h3>Select a Map</h3>
-        <p>Choose a map from the sidebar to explore it with the Felt SDK</p>
-      </div>
-      
-      <div class="map-frame" id="map-frame" style="display: none;">
-        <div id="map-embed-container"></div>
-        <div class="map-crosshair" id="map-crosshair">
-          <div class="crosshair-circle"></div>
-          <div class="crosshair-label">Analysis Point</div>
-        </div>
-      </div>
-    </main>
-
-    <!-- Right Sidebar: SDK Analytics -->
-    <aside class="sidebar-right">
-      <div class="sidebar-section">
-        <div class="sidebar-title">Map Stats</div>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-value" id="stat-layers">—</div>
-            <div class="stat-label">Layers</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-elements">—</div>
-            <div class="stat-label">Annotations</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-features">—</div>
-            <div class="stat-label">Features</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-zoom">—</div>
-            <div class="stat-label">Zoom</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-title">Viewport</div>
-        <div class="viewport-info">
-          <div class="viewport-row">
-            <span class="viewport-label">Latitude</span>
-            <span class="viewport-value" id="vp-lat">—</span>
-          </div>
-          <div class="viewport-row">
-            <span class="viewport-label">Longitude</span>
-            <span class="viewport-value" id="vp-lng">—</span>
-          </div>
-          <div class="viewport-row">
-            <span class="viewport-label">Zoom</span>
-            <span class="viewport-value" id="vp-zoom">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-title">Layers</div>
-        <div class="layer-list" id="layer-list">
-          <div class="empty-state">
-            <div class="empty-icon">📑</div>
-            <div>No map loaded</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-title">Selected Feature</div>
-        <div id="feature-panel">
-          <div class="empty-state">
-            <div class="empty-icon">👆</div>
-            <div>Click a feature on the map</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-title">Quick Actions</div>
-        <div class="actions-grid">
-          <button class="action-btn" id="action-fit">
-            <span>🔍</span>
-            Fit to Data
-          </button>
-          <button class="action-btn" id="action-toggle">
-            <span>👁️</span>
-            Toggle Layers
-          </button>
-          <button class="action-btn" id="action-clear">
-            <span>✖️</span>
-            Clear Selection
-          </button>
-          <button class="action-btn" id="action-table">
-            <span>📋</span>
-            Data Table
-          </button>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-title">🧪 Spatial Analysis</div>
-        <div class="analysis-controls">
-          <div class="analysis-layer-select">
-            <label class="analysis-label">Analysis Layer</label>
-            <select id="analysis-layer-select" class="analysis-select">
-              <option value="">Select a layer...</option>
-            </select>
-          </div>
-          
-          <div class="analysis-tools">
-            <button class="analysis-btn" id="tool-buffer" title="Draw a buffer and count features inside">
-              <span>⭕</span>
-              Buffer
-            </button>
-            <button class="analysis-btn" id="tool-nearest" title="Find nearest features to a point">
-              <span>📍</span>
-              Nearest
-            </button>
-            <button class="analysis-btn" id="tool-stats" title="Get statistics for the entire layer">
-              <span>📊</span>
-              Stats
-            </button>
-            <button class="analysis-btn" id="tool-point-query" title="Click to find which polygon contains a point">
-              <span>🎯</span>
-              Point Query
-            </button>
-          </div>
-          
-          <div id="analysis-options" class="analysis-options" style="display: none;">
-            <!-- Dynamic options based on selected tool -->
-          </div>
-          
-          <div id="analysis-instructions" class="analysis-instructions" style="display: none;">
-            <!-- Instructions for current tool -->
-          </div>
-          
-          <button class="btn btn-primary btn-sm" id="run-analysis" style="display: none; width: 100%; margin-top: 8px;">
-            ▶ Run at Map Center
-          </button>
-          
-          <button class="btn btn-secondary btn-sm" id="cancel-analysis" style="display: none; width: 100%; margin-top: 8px;">
-            Cancel
-          </button>
-        </div>
-      </div>
-
-      <div class="sidebar-section" id="analysis-results-section" style="display: none;">
-        <div class="sidebar-title">📋 Analysis Results</div>
-        <div id="analysis-results" class="analysis-results">
-          <!-- Results will be rendered here -->
-        </div>
-        <button class="btn btn-ghost btn-sm" id="clear-results" style="width: 100%; margin-top: 8px;">
-          Clear Results
-        </button>
-      </div>
-    </aside>
   </div>
-
+  
   <script type="module">
-    // ============================================
-    // LOAD FELT SDK & TURF.JS VIA ES MODULE
-    // ============================================
     import { Felt } from "https://esm.run/@feltmaps/js-sdk";
-    import * as turf from "https://esm.run/@turf/turf";
-
-    // ============================================
-    // CONFIGURATION
-    // ============================================
-    const FELT_API_TOKEN = 'felt_pat_g7Hsba0Jom7DMRsbNCPKzJXd9CyKHoiOLBM4lOEeBLY';
-    const FELT_API_BASE = 'https://felt.com/api/v2';
-
-    // ============================================
-    // STATE
-    // ============================================
-    const state = {
-      maps: [],
-      currentMapId: null,
-      felt: null,
-      layers: [],
-      elements: [],
-      selectedFeature: null,
-      viewport: null,
-      layersVisible: true,
-      // Analysis state
-      analysisMode: null, // 'buffer', 'nearest', 'pointQuery', null
-      analysisLayer: null, // Selected layer for analysis
-      bufferRadius: 1000, // meters
-      nearestCount: 5,
-      analysisResults: null,
-      drawnElements: [] // Track elements we create for analysis
-    };
-
-    const layerColors = [
-      '#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#ec4899',
-      '#8b5cf6', '#14b8a6', '#f97316', '#ef4444', '#06b6d4'
-    ];
-
-    // ============================================
-    // Map URL Input (no API needed - avoids CORS)
-    // ============================================
+    
+    // State
+    let felt = null;
+    let layers = [];
+    let selectedLayer = null;
+    let selectedTool = null;
+    let viewport = null;
+    let layerSchema = null;
+    
+    // DOM refs
+    const mapContainer = document.getElementById('map');
+    const layerSelect = document.getElementById('layer-select');
+    const resultsDiv = document.getElementById('results');
+    const statusDiv = document.getElementById('status');
+    const crosshair = document.getElementById('crosshair');
+    const toolParams = document.getElementById('tool-params');
+    
+    function setStatus(msg, type = '') {
+      statusDiv.textContent = msg;
+      statusDiv.className = 'status ' + type;
+    }
+    
+    function showResults(html) {
+      resultsDiv.innerHTML = html;
+      resultsDiv.classList.remove('hidden');
+    }
+    
+    // Extract map ID from URL
     function extractMapId(input) {
-      // Handle full URLs like https://felt.com/map/Map-Name-abc123
-      const urlMatch = input.match(/felt\.com\/map\/[^\/]+-([a-zA-Z0-9]+)/);
-      if (urlMatch) return urlMatch[1];
+      const match = input.match(/felt\.com\/map\/[^\/]+-([a-zA-Z0-9]+)/);
+      return match ? match[1] : input.trim();
+    }
+    
+    // Load map
+    window.loadMap = async function() {
+      const url = document.getElementById('map-url').value;
+      const mapId = extractMapId(url);
       
-      // Handle just the ID
-      if (/^[a-zA-Z0-9]+$/.test(input.trim())) return input.trim();
-      
-      return null;
-    }
-
-    function loadMapFromInput() {
-      const input = document.getElementById('map-url-input').value;
-      const mapId = extractMapId(input);
-      
-      if (mapId) {
-        loadMap(mapId, 'Custom Map');
-        // Save to recent maps
-        addToRecentMaps(mapId, input);
-      } else {
-        alert('Please enter a valid Felt map URL or ID');
-      }
-    }
-
-    function addToRecentMaps(mapId, url) {
-      const existing = state.maps.find(m => m.id === mapId);
-      if (!existing) {
-        state.maps.unshift({ 
-          id: mapId, 
-          title: `Map ${mapId.substring(0, 8)}...`,
-          thumbnail_url: null,
-          created_at: new Date().toISOString()
-        });
-        renderMapList();
-        saveRecentMaps();
-      }
-    }
-
-    function saveRecentMaps() {
-      try {
-        localStorage.setItem('felt-explorer-maps', JSON.stringify(state.maps.slice(0, 20)));
-      } catch (e) {}
-    }
-
-    function loadRecentMaps() {
-      try {
-        const saved = localStorage.getItem('felt-explorer-maps');
-        if (saved) {
-          state.maps = JSON.parse(saved);
-          renderMapList();
-        }
-      } catch (e) {}
-    }
-
-    function renderMapList() {
-      const container = document.getElementById('map-list');
-      if (!state.maps.length) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">🗺️</div>
-            <div>Paste a Felt map URL above</div>
-          </div>
-        `;
+      if (!mapId) {
+        setStatus('Invalid map URL', 'error');
         return;
       }
-
-      container.innerHTML = state.maps.map(map => `
-        <div class="map-list-item ${state.currentMapId === map.id ? 'active' : ''}" data-map-id="${map.id}">
-          <div class="map-list-thumb">
-            ${map.thumbnail_url 
-              ? `<img src="${map.thumbnail_url}" alt="">` 
-              : '🗺️'}
-          </div>
-          <div class="map-list-info">
-            <div class="map-list-name">${escapeHtml(map.title || 'Untitled')}</div>
-            <div class="map-list-meta">${formatDate(map.created_at)}</div>
-          </div>
-        </div>
-      `).join('');
-
-      // Add click handlers
-      container.querySelectorAll('.map-list-item').forEach(item => {
-        item.addEventListener('click', () => loadMap(item.dataset.mapId));
-      });
-    }
-
-    // ============================================
-    // FELT JS SDK INTEGRATION
-    // ============================================
-    async function loadMap(mapId) {
-      state.currentMapId = mapId;
-      const map = state.maps.find(m => m.id === mapId);
+      
+      setStatus('Loading map...', 'loading');
+      mapContainer.innerHTML = '';
+      
+      try {
+        felt = await Felt.embed(mapContainer, mapId);
+        setStatus('Map loaded!', 'success');
+        
+        // Get viewport
+        viewport = await felt.getViewport();
+        felt.onViewportMoveEnd({ handler: (vp) => { viewport = vp; } });
+        
+        // Get layers
+        layers = await felt.getLayers() || [];
+        
+        // Populate layer dropdown
+        layerSelect.innerHTML = '<option value="">Choose a layer...</option>';
+        layers.forEach(layer => {
+          const opt = document.createElement('option');
+          opt.value = layer.id;
+          opt.textContent = layer.name || layer.id;
+          layerSelect.appendChild(opt);
+        });
+        
+        document.getElementById('layer-card').classList.remove('hidden');
+        
+      } catch (e) {
+        setStatus('Error: ' + e.message, 'error');
+        console.error(e);
+      }
+    };
+    
+    // Layer selection
+    layerSelect.addEventListener('change', async (e) => {
+      selectedLayer = e.target.value;
+      if (!selectedLayer) {
+        document.getElementById('tools-card').classList.add('hidden');
+        return;
+      }
+      
+      setStatus('Loading layer info...', 'loading');
+      
+      try {
+        // Get feature count
+        const result = await felt.getFeatures({ layerId: selectedLayer, pageSize: 1 });
+        const count = result?.count || 'Unknown';
+        
+        // Get schema for attribute names
+        try {
+          const schema = await felt.getLayerSchema({ layerId: selectedLayer });
+          layerSchema = schema;
+        } catch (e) {
+          // Try to infer from first feature
+          if (result?.features?.[0]?.properties) {
+            layerSchema = { attributes: Object.keys(result.features[0].properties) };
+          }
+        }
+        
+        document.getElementById('layer-info').textContent = `${count.toLocaleString()} features`;
+        document.getElementById('tools-card').classList.remove('hidden');
+        setStatus('Ready', 'success');
+        
+      } catch (e) {
+        setStatus('Error loading layer: ' + e.message, 'error');
+      }
+    });
+    
+    // Tool selection
+    window.selectTool = function(tool) {
+      selectedTool = tool;
       
       // Update UI
-      document.getElementById('map-placeholder').style.display = 'none';
-      document.getElementById('map-frame').style.display = 'block';
-      document.getElementById('map-toolbar').style.display = 'flex';
-      document.getElementById('current-map-title').textContent = map?.title || 'Loading...';
-      document.getElementById('open-felt-btn').href = map?.url || `https://felt.com/map/${mapId}`;
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === tool);
+      });
       
-      renderMapList();
+      // Show/hide crosshair for spatial tools
+      crosshair.classList.toggle('hidden', tool === 'stats');
       
-      // Reset state
-      state.felt = null;
-      state.layers = [];
-      state.elements = [];
-      state.selectedFeature = null;
-      updateSdkStatus(false);
-      resetStats();
+      // Show tool-specific params
+      toolParams.classList.remove('hidden');
       
-      // Get the container and embed
-      const container = document.getElementById('map-embed-container');
-      container.innerHTML = ''; // Clear previous embed
-      
-      try {
-        console.log('Embedding map:', mapId);
-        
-        // Use the SDK to embed the map
-        state.felt = await Felt.embed(container, mapId, {
-          uiControls: {
-            cooperativeGestures: false,
-            fullScreenButton: true,
-            showLegend: true
-          }
-        });
-        
-        updateSdkStatus(true);
-        console.log('✅ Felt SDK connected!');
-        
-        // Load initial data
-        await Promise.all([
-          loadLayers(),
-          loadElements(),
-          loadViewport()
-        ]);
-        
-        // Set up event listeners
-        setupSdkListeners();
-        
-      } catch (error) {
-        console.error('SDK embed failed:', error);
-        updateSdkStatus(false);
-        container.innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">
-            <div style="text-align:center;">
-              <div style="font-size:3rem;margin-bottom:16px;">⚠️</div>
-              <p>Could not load map</p>
-              <p style="font-size:0.8rem;margin-top:8px;">${escapeHtml(error.message)}</p>
-            </div>
+      if (tool === 'buffer') {
+        toolParams.innerHTML = `
+          <div class="param-row">
+            <label>Radius</label>
+            <input type="number" id="buffer-radius" value="100" min="1"> km
+          </div>
+          <p style="font-size:0.75rem; color:#94a3b8; margin-top:8px;">
+            Pan the map to position the crosshair, then click Run.
+          </p>
+        `;
+      } else if (tool === 'categories') {
+        const attrs = layerSchema?.attributes || ['(loading...)'];
+        toolParams.innerHTML = `
+          <div class="param-row">
+            <label>Attribute</label>
+            <select id="cat-attribute">
+              ${attrs.filter(a => !a.startsWith('felt:')).map(a => `<option value="${a}">${a}</option>`).join('')}
+            </select>
           </div>
         `;
-      }
-    }
-
-    function setupSdkListeners() {
-      if (!state.felt) return;
-      
-      // Viewport changes
-      state.felt.onViewportMoveEnd({
-        handler: (viewport) => {
-          state.viewport = viewport;
-          updateViewportDisplay();
-        }
-      });
-      
-      // Selection changes
-      state.felt.onSelectionChange({
-        handler: async ({ selection }) => {
-          if (selection && selection.length > 0) {
-            const sel = selection[0];
-            if (sel.type === 'feature' && sel.entity) {
-              try {
-                const feature = await state.felt.getFeature({
-                  id: sel.entity.id,
-                  layerId: sel.entity.layerId
-                });
-                state.selectedFeature = feature;
-                renderFeaturePanel();
-              } catch (e) {
-                console.log('Could not get feature:', e);
-              }
-            }
-          } else {
-            state.selectedFeature = null;
-            renderFeaturePanel();
-          }
-        }
-      });
-    }
-
-    async function loadLayers() {
-      if (!state.felt) return;
-      try {
-        state.layers = await state.felt.getLayers() || [];
-        state.layers = state.layers.filter(l => l && l.id);
-        document.getElementById('stat-layers').textContent = state.layers.length;
-        renderLayerList();
-        updateAnalysisLayerSelect(); // Update analysis layer dropdown
-        
-        // Get feature count from first visible layer
-        let totalFeatures = 0;
-        for (const layer of state.layers.slice(0, 3)) {
-          try {
-            const result = await state.felt.getAggregates({
-              layerId: layer.id,
-              calculations: ['count']
-            });
-            totalFeatures += result?.count || 0;
-          } catch (e) {
-            // Skip layers that don't support aggregates
-          }
-        }
-        document.getElementById('stat-features').textContent = formatNumber(totalFeatures);
-      } catch (e) {
-        console.log('Could not load layers:', e);
-      }
-    }
-
-    async function loadElements() {
-      if (!state.felt) return;
-      try {
-        state.elements = await state.felt.getElements() || [];
-        state.elements = state.elements.filter(e => e && e.id);
-        document.getElementById('stat-elements').textContent = state.elements.length;
-      } catch (e) {
-        console.log('Could not load elements:', e);
-      }
-    }
-
-    async function loadViewport() {
-      if (!state.felt) return;
-      try {
-        state.viewport = await state.felt.getViewport();
-        updateViewportDisplay();
-      } catch (e) {
-        console.log('Could not load viewport:', e);
-      }
-    }
-
-    function updateViewportDisplay() {
-      if (!state.viewport) return;
-      const center = state.viewport.center;
-      document.getElementById('vp-lat').textContent = center?.latitude?.toFixed(5) || '—';
-      document.getElementById('vp-lng').textContent = center?.longitude?.toFixed(5) || '—';
-      document.getElementById('vp-zoom').textContent = state.viewport.zoom?.toFixed(2) || '—';
-      document.getElementById('stat-zoom').textContent = state.viewport.zoom?.toFixed(1) || '—';
-    }
-
-    function renderLayerList() {
-      const container = document.getElementById('layer-list');
-      if (!state.layers.length) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📑</div>
-            <div>No layers</div>
+      } else if (tool === 'histogram') {
+        const attrs = layerSchema?.attributes || ['(loading...)'];
+        toolParams.innerHTML = `
+          <div class="param-row">
+            <label>Attribute</label>
+            <select id="hist-attribute">
+              ${attrs.filter(a => !a.startsWith('felt:')).map(a => `<option value="${a}">${a}</option>`).join('')}
+            </select>
+          </div>
+          <div class="param-row">
+            <label>Bins</label>
+            <input type="number" id="hist-bins" value="5" min="2" max="20">
           </div>
         `;
-        return;
+      } else {
+        toolParams.innerHTML = '<p style="font-size:0.75rem; color:#94a3b8;">Click Run to get layer statistics.</p>';
       }
-
-      container.innerHTML = state.layers.map((layer, i) => `
-        <div class="layer-item ${layer.visible === false ? 'hidden' : ''}" data-layer-id="${layer.id}">
-          <div class="layer-color" style="background: ${layerColors[i % layerColors.length]}"></div>
-          <div class="layer-name">${escapeHtml(layer.name || 'Unnamed')}</div>
-          <div class="layer-toggle">${layer.visible === false ? '○' : '●'}</div>
-        </div>
-      `).join('');
-
-      container.querySelectorAll('.layer-item').forEach(item => {
-        item.addEventListener('click', () => toggleLayer(item.dataset.layerId));
-      });
-    }
-
-    function renderFeaturePanel() {
-      const container = document.getElementById('feature-panel');
-      
-      if (!state.selectedFeature || !state.selectedFeature.properties) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">👆</div>
-            <div>Click a feature on the map</div>
-          </div>
-        `;
-        return;
-      }
-
-      const props = Object.entries(state.selectedFeature.properties).slice(0, 12);
-      const featureId = state.selectedFeature.id || 'Unknown';
-
-      container.innerHTML = `
-        <div class="feature-panel fade-in">
-          <div class="feature-header">
-            <div class="feature-title">Feature Selected</div>
-            <div class="feature-subtitle">ID: ${escapeHtml(String(featureId).slice(0, 20))}</div>
-          </div>
-          <div class="feature-props">
-            ${props.map(([key, value]) => `
-              <div class="feature-row">
-                <span class="feature-key">${escapeHtml(truncate(key, 12))}</span>
-                <span class="feature-val">${escapeHtml(formatValue(value))}</span>
-              </div>
-            `).join('')}
-          </div>
-          <div class="feature-actions">
-            <button class="btn btn-secondary btn-sm" style="flex:1" id="zoom-feature-btn">🎯 Zoom</button>
-            <button class="btn btn-primary btn-sm" style="flex:1" id="copy-feature-btn">📋 Copy</button>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('zoom-feature-btn')?.addEventListener('click', zoomToFeature);
-      document.getElementById('copy-feature-btn')?.addEventListener('click', copyFeature);
-    }
-
-    // ============================================
-    // SDK ACTIONS
-    // ============================================
-    async function toggleLayer(layerId) {
-      if (!state.felt) return;
-      const layer = state.layers.find(l => l.id === layerId);
-      if (!layer) return;
-      
-      const isVisible = layer.visible !== false;
-      try {
-        await state.felt.setLayerVisibility({
-          show: isVisible ? [] : [layerId],
-          hide: isVisible ? [layerId] : []
-        });
-        layer.visible = !isVisible;
-        renderLayerList();
-      } catch (e) {
-        console.log('Could not toggle layer:', e);
-      }
-    }
-
-    async function zoomToFit() {
-      if (!state.felt || !state.layers.length) return;
-      try {
-        const layerIds = state.layers.map(l => l.id);
-        await state.felt.fitViewportToBounds({ layerIds });
-      } catch (e) {
-        console.log('Could not fit bounds:', e);
-      }
-    }
-
-    async function toggleAllLayers() {
-      if (!state.felt || !state.layers.length) return;
-      state.layersVisible = !state.layersVisible;
-      try {
-        await state.felt.setLayerVisibility({
-          show: state.layersVisible ? state.layers.map(l => l.id) : [],
-          hide: state.layersVisible ? [] : state.layers.map(l => l.id)
-        });
-        state.layers.forEach(l => l.visible = state.layersVisible);
-        renderLayerList();
-      } catch (e) {
-        console.log('Could not toggle all layers:', e);
-      }
-    }
-
-    async function clearSelection() {
-      if (!state.felt) return;
-      try {
-        await state.felt.setSelection({ selection: [] });
-        state.selectedFeature = null;
-        renderFeaturePanel();
-      } catch (e) {
-        console.log('Could not clear selection:', e);
-      }
-    }
-
-    async function showDataTable() {
-      if (!state.felt || !state.layers.length) return;
-      try {
-        await state.felt.showLayerDataTable({ layerId: state.layers[0].id });
-      } catch (e) {
-        console.log('Could not show data table:', e);
-      }
-    }
-
-    async function zoomToFeature() {
-      if (!state.felt || !state.selectedFeature) return;
-      try {
-        await state.felt.selectFeature({
-          id: state.selectedFeature.id,
-          layerId: state.selectedFeature.layerId,
-          fitViewport: true
-        });
-      } catch (e) {
-        console.log('Could not zoom to feature:', e);
-      }
-    }
-
-    function copyFeature() {
-      if (!state.selectedFeature) return;
-      const text = JSON.stringify(state.selectedFeature.properties, null, 2);
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Feature properties copied!');
-      });
-    }
-
-    async function refreshSDK() {
-      if (!state.felt) return;
-      await Promise.all([
-        loadLayers(),
-        loadElements(),
-        loadViewport()
-      ]);
-    }
-
-    // ============================================
-    // UI HELPERS
-    // ============================================
-    function updateSdkStatus(connected) {
-      const el = document.getElementById('sdk-status');
-      el.className = `sdk-status ${connected ? 'connected' : 'disconnected'}`;
-      el.innerHTML = `
-        <div class="sdk-status-dot"></div>
-        <span>SDK ${connected ? 'Connected' : 'Disconnected'}</span>
-      `;
-    }
-
-    function resetStats() {
-      document.getElementById('stat-layers').textContent = '—';
-      document.getElementById('stat-elements').textContent = '—';
-      document.getElementById('stat-features').textContent = '—';
-      document.getElementById('stat-zoom').textContent = '—';
-      document.getElementById('vp-lat').textContent = '—';
-      document.getElementById('vp-lng').textContent = '—';
-      document.getElementById('vp-zoom').textContent = '—';
-      document.getElementById('layer-list').innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📑</div>
-          <div>Loading...</div>
-        </div>
-      `;
-      document.getElementById('feature-panel').innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">👆</div>
-          <div>Click a feature on the map</div>
-        </div>
-      `;
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function truncate(str, len) {
-      if (!str) return '';
-      str = String(str);
-      return str.length > len ? str.slice(0, len) + '…' : str;
-    }
-
-    function formatNumber(num) {
-      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-      return String(num);
-    }
-
-    function formatValue(val) {
-      if (val === null || val === undefined) return '—';
-      if (typeof val === 'number') return val.toLocaleString();
-      if (typeof val === 'boolean') return val ? '✓' : '✗';
-      return truncate(String(val), 20);
-    }
-
-    function formatDate(dateStr) {
-      if (!dateStr) return '';
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-
-    // ============================================
-    // SPATIAL ANALYSIS FUNCTIONS
-    // ============================================
+    };
     
-    function updateAnalysisLayerSelect() {
-      const select = document.getElementById('analysis-layer-select');
-      select.innerHTML = '<option value="">Select a layer...</option>';
-      
-      state.layers.forEach(layer => {
-        const option = document.createElement('option');
-        option.value = layer.id;
-        option.textContent = layer.name || `Layer ${layer.id.substring(0, 8)}`;
-        select.appendChild(option);
-      });
-    }
-
-    function setAnalysisMode(mode) {
-      // Clear previous mode
-      document.querySelectorAll('.analysis-btn').forEach(btn => btn.classList.remove('active'));
-      
-      state.analysisMode = mode;
-      
-      const optionsEl = document.getElementById('analysis-options');
-      const instructionsEl = document.getElementById('analysis-instructions');
-      const cancelBtn = document.getElementById('cancel-analysis');
-      const runBtn = document.getElementById('run-analysis');
-      const crosshair = document.getElementById('map-crosshair');
-      
-      if (!mode) {
-        optionsEl.style.display = 'none';
-        instructionsEl.style.display = 'none';
-        cancelBtn.style.display = 'none';
-        runBtn.style.display = 'none';
-        crosshair.classList.remove('active');
+    // Run analysis
+    window.runAnalysis = async function() {
+      if (!selectedLayer || !selectedTool) {
+        setStatus('Select a layer and tool first', 'error');
         return;
       }
       
-      // Highlight active button
-      const btnMap = {
-        'buffer': 'tool-buffer',
-        'nearest': 'tool-nearest',
-        'stats': 'tool-stats',
-        'pointQuery': 'tool-point-query'
-      };
-      document.getElementById(btnMap[mode])?.classList.add('active');
+      setStatus('Running analysis...', 'loading');
       
-      // Show cancel button
-      cancelBtn.style.display = 'block';
-      
-      // Set up mode-specific options and instructions
-      switch (mode) {
-        case 'buffer':
-          optionsEl.innerHTML = `
-            <label>
-              Buffer radius
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="number" id="buffer-radius" value="${state.bufferRadius}" min="100" max="50000" step="100">
-                <span style="color: var(--text-muted); font-size: 0.75rem;">meters</span>
-              </div>
-            </label>
-          `;
-          optionsEl.style.display = 'block';
-          instructionsEl.innerHTML = '🎯 Pan the map so the crosshair is at your desired center point, then click Run';
-          instructionsEl.style.display = 'block';
-          instructionsEl.className = 'analysis-instructions';
-          runBtn.style.display = 'block';
-          crosshair.classList.add('active');
+      try {
+        let html = '';
+        
+        if (selectedTool === 'buffer') {
+          // Buffer query using boundary
+          const radiusKm = parseFloat(document.getElementById('buffer-radius').value) || 100;
+          const center = viewport.center;
           
-          document.getElementById('buffer-radius').addEventListener('change', (e) => {
-            state.bufferRadius = parseInt(e.target.value) || 1000;
+          // Create bounding box (approximate - 1 degree ≈ 111km at equator)
+          const degPerKm = 1 / 111;
+          const latDelta = radiusKm * degPerKm;
+          const lngDelta = radiusKm * degPerKm / Math.cos(center.latitude * Math.PI / 180);
+          
+          const boundary = [
+            center.longitude - lngDelta,
+            center.latitude - latDelta,
+            center.longitude + lngDelta,
+            center.latitude + latDelta
+          ];
+          
+          // Get count in boundary
+          const agg = await felt.getAggregates({ 
+            layerId: selectedLayer, 
+            boundary 
           });
-          break;
           
-        case 'nearest':
-          optionsEl.innerHTML = `
-            <label>
-              Number of results
-              <input type="number" id="nearest-count" value="${state.nearestCount}" min="1" max="50">
-            </label>
-          `;
-          optionsEl.style.display = 'block';
-          instructionsEl.innerHTML = '🎯 Pan the map to your reference point, then click Run';
-          instructionsEl.style.display = 'block';
-          instructionsEl.className = 'analysis-instructions';
-          runBtn.style.display = 'block';
-          crosshair.classList.add('active');
+          // Get total count
+          const total = await felt.getAggregates({ layerId: selectedLayer });
           
-          document.getElementById('nearest-count').addEventListener('change', (e) => {
-            state.nearestCount = parseInt(e.target.value) || 5;
+          // Get some features for display
+          const features = await felt.getFeatures({ 
+            layerId: selectedLayer, 
+            boundary,
+            pageSize: 10 
           });
-          break;
           
-        case 'stats':
-          optionsEl.style.display = 'none';
-          instructionsEl.style.display = 'none';
-          runBtn.style.display = 'none';
-          crosshair.classList.remove('active');
-          // Run immediately
-          runLayerStats();
-          break;
+          const countInBuffer = agg?.count || 0;
+          const totalCount = total?.count || 0;
+          const pct = totalCount > 0 ? ((countInBuffer / totalCount) * 100).toFixed(1) : 0;
           
-        case 'pointQuery':
-          optionsEl.style.display = 'none';
-          instructionsEl.innerHTML = '🎯 Pan the map so the crosshair is inside a polygon, then click Run';
-          instructionsEl.style.display = 'block';
-          instructionsEl.className = 'analysis-instructions';
-          runBtn.style.display = 'block';
-          crosshair.classList.add('active');
-          break;
-      }
-    }
-
-    function cancelAnalysis() {
-      setAnalysisMode(null);
-      // Clean up any drawn elements
-      cleanupAnalysisElements();
-    }
-
-    async function cleanupAnalysisElements() {
-      if (!state.felt || !state.drawnElements.length) return;
-      
-      for (const elementId of state.drawnElements) {
-        try {
-          await state.felt.deleteElement({ id: elementId });
-        } catch (e) {
-          console.log('Could not delete element:', e);
-        }
-      }
-      state.drawnElements = [];
-    }
-
-    async function getAllLayerFeatures(layerId) {
-      if (!state.felt) return [];
-      
-      try {
-        // Try to get features using getFeatures method
-        const result = await state.felt.getFeatures({ layerId });
-        const features = result?.features || [];
-        
-        // Normalize features - extract geometry from properties if needed
-        return features.map(f => normalizeFeatureGeometry(f));
-      } catch (e) {
-        console.log('getFeatures not available, trying alternative:', e);
-        return [];
-      }
-    }
-
-    // Handle features where geometry is null but lat/lng are in properties
-    function normalizeFeatureGeometry(feature) {
-      // If geometry already exists, return as-is
-      if (feature.geometry && feature.geometry.coordinates) {
-        return feature;
-      }
-      
-      // Try to extract lat/lng from properties
-      const props = feature.properties || {};
-      
-      // Common field names for coordinates
-      const latFields = ['latitude', 'lat', 'Latitude', 'LAT', 'y', 'Y'];
-      const lngFields = ['longitude', 'lng', 'lon', 'Longitude', 'LNG', 'LON', 'x', 'X'];
-      
-      let lat = null, lng = null;
-      
-      for (const field of latFields) {
-        if (props[field] !== undefined && props[field] !== null) {
-          lat = parseFloat(props[field]);
-          break;
-        }
-      }
-      
-      for (const field of lngFields) {
-        if (props[field] !== undefined && props[field] !== null) {
-          lng = parseFloat(props[field]);
-          break;
-        }
-      }
-      
-      // If we found valid coordinates, create a Point geometry
-      if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
-        return {
-          ...feature,
-          geometry: {
-            type: 'Point',
-            coordinates: [Number(lng), Number(lat)]  // Ensure they're numbers
-          }
-        };
-      }
-      
-      // Return original if we can't extract geometry
-      return feature;
-    }
-
-    async function handleAnalysisClick(event) {
-      if (!state.analysisMode || !state.analysisLayer) return;
-      if (!state.viewport) return;
-      
-      // Get click location from the viewport center or use selection
-      // Since we can't get exact click coords easily, we'll use selected feature location
-      // or the current viewport center
-      
-      const clickPoint = state.viewport.center;
-      
-      switch (state.analysisMode) {
-        case 'buffer':
-          await runBufferAnalysis(clickPoint);
-          break;
-        case 'nearest':
-          await runNearestAnalysis(clickPoint);
-          break;
-        case 'pointQuery':
-          await runPointQuery(clickPoint);
-          break;
-      }
-    }
-
-    async function runBufferAnalysis(center) {
-      if (!state.analysisLayer) {
-        showAnalysisError('Please select a layer first');
-        return;
-      }
-      
-      showAnalysisLoading('Running buffer analysis...');
-      
-      try {
-        // Create center point
-        const centerPoint = turf.point([center.longitude, center.latitude]);
-        
-        // Create buffer (radius in meters, need to convert to kilometers for turf)
-        const radiusKm = state.bufferRadius / 1000;
-        const buffer = turf.buffer(centerPoint, radiusKm, { units: 'kilometers' });
-        
-        // Get all features from the layer
-        const features = await getAllLayerFeatures(state.analysisLayer);
-        
-        if (!features.length) {
-          showAnalysisError('Could not retrieve features from layer. Try using Layer Stats instead.');
-          return;
-        }
-        
-        // Find features within buffer
-        const featuresInBuffer = [];
-        for (const feature of features) {
-          if (!feature.geometry || !feature.geometry.coordinates) continue;
-          
-          try {
-            // Ensure coordinates are numbers
-            const coords = feature.geometry.coordinates;
-            const lng = Number(coords[0]);
-            const lat = Number(coords[1]);
-            
-            if (isNaN(lng) || isNaN(lat)) continue;
-            
-            // Check if feature intersects buffer
-            const featureGeom = feature.geometry.type === 'Point' 
-              ? turf.point([lng, lat])
-              : feature;
-            
-            if (turf.booleanIntersects(buffer, featureGeom)) {
-              featuresInBuffer.push(feature);
-            }
-          } catch (e) {
-            // Skip invalid geometries
-            console.log('Buffer intersect error:', e);
-          }
-        }
-        
-        // Calculate stats
-        const results = {
-          type: 'buffer',
-          center: center,
-          radius: state.bufferRadius,
-          totalFeatures: features.length,
-          featuresInBuffer: featuresInBuffer.length,
-          percentage: ((featuresInBuffer.length / features.length) * 100).toFixed(1),
-          features: featuresInBuffer.slice(0, 20) // Limit to first 20 for display
-        };
-        
-        // Try to draw the buffer on the map
-        try {
-          const bufferCoords = buffer.geometry.coordinates[0];
-          const element = await state.felt.createElement({
-            type: 'Polygon',
-            coordinates: [bufferCoords],
-            color: '#6366f1',
-            fillOpacity: 0.2,
-            strokeWidth: 2
-          });
-          if (element?.id) {
-            state.drawnElements.push(element.id);
-          }
-        } catch (e) {
-          console.log('Could not draw buffer:', e);
-        }
-        
-        displayAnalysisResults(results);
-        
-      } catch (error) {
-        console.error('Buffer analysis error:', error);
-        showAnalysisError('Buffer analysis failed: ' + error.message);
-      }
-    }
-
-    async function runNearestAnalysis(center) {
-      if (!state.analysisLayer) {
-        showAnalysisError('Please select a layer first');
-        return;
-      }
-      
-      showAnalysisLoading('Finding nearest features...');
-      
-      try {
-        const centerPoint = turf.point([center.longitude, center.latitude]);
-        
-        // Get all features
-        const features = await getAllLayerFeatures(state.analysisLayer);
-        
-        if (!features.length) {
-          showAnalysisError('Could not retrieve features from layer.');
-          return;
-        }
-        
-        // Calculate distances and sort
-        const withDistances = features
-          .filter(f => f.geometry && f.geometry.coordinates)
-          .map(feature => {
-            let distance;
-            try {
-              // Ensure coordinates are numbers
-              const coords = feature.geometry.coordinates;
-              const lng = Number(coords[0]);
-              const lat = Number(coords[1]);
-              
-              if (isNaN(lng) || isNaN(lat)) {
-                return { ...feature, distance: Infinity };
-              }
-              
-              if (feature.geometry.type === 'Point') {
-                distance = turf.distance(centerPoint, turf.point([lng, lat]), { units: 'meters' });
-              } else {
-                // For polygons/lines, get centroid
-                const centroid = turf.centroid(feature);
-                distance = turf.distance(centerPoint, centroid, { units: 'meters' });
-              }
-            } catch (e) {
-              console.log('Distance calc error:', e);
-              distance = Infinity;
-            }
-            return { ...feature, distance };
-          })
-          .filter(f => f.distance !== Infinity)
-          .sort((a, b) => a.distance - b.distance)
-          .slice(0, state.nearestCount);
-        
-        const results = {
-          type: 'nearest',
-          center: center,
-          count: state.nearestCount,
-          found: withDistances.length,
-          features: withDistances
-        };
-        
-        displayAnalysisResults(results);
-        
-      } catch (error) {
-        console.error('Nearest analysis error:', error);
-        showAnalysisError('Nearest analysis failed: ' + error.message);
-      }
-    }
-
-    async function runPointQuery(center) {
-      if (!state.analysisLayer) {
-        showAnalysisError('Please select a layer first');
-        return;
-      }
-      
-      showAnalysisLoading('Querying point location...');
-      
-      try {
-        const queryPoint = turf.point([center.longitude, center.latitude]);
-        
-        // Get all features
-        const features = await getAllLayerFeatures(state.analysisLayer);
-        
-        if (!features.length) {
-          showAnalysisError('Could not retrieve features from layer.');
-          return;
-        }
-        
-        // Find containing polygons
-        const containingFeatures = features.filter(feature => {
-          if (!feature.geometry) return false;
-          if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-          
-          try {
-            return turf.booleanPointInPolygon(queryPoint, feature);
-          } catch (e) {
-            return false;
-          }
-        });
-        
-        const results = {
-          type: 'pointQuery',
-          center: center,
-          found: containingFeatures.length,
-          features: containingFeatures
-        };
-        
-        displayAnalysisResults(results);
-        
-      } catch (error) {
-        console.error('Point query error:', error);
-        showAnalysisError('Point query failed: ' + error.message);
-      }
-    }
-
-    async function runLayerStats() {
-      if (!state.analysisLayer) {
-        showAnalysisError('Please select a layer first');
-        return;
-      }
-      
-      showAnalysisLoading('Calculating layer statistics...');
-      
-      try {
-        // Get all features
-        const features = await getAllLayerFeatures(state.analysisLayer);
-        
-        // Also try to get aggregate count from SDK
-        let sdkCount = null;
-        try {
-          const aggregates = await state.felt.getAggregates({
-            layerId: state.analysisLayer,
-            calculations: [{ type: 'count' }]
-          });
-          sdkCount = aggregates?.results?.[0]?.value;
-        } catch (e) {
-          console.log('Could not get aggregates:', e);
-        }
-        
-        // Calculate statistics
-        const stats = {
-          type: 'stats',
-          featureCount: features.length || sdkCount || 'Unknown',
-          geometryTypes: {},
-          totalArea: 0,
-          totalLength: 0,
-          attributeBreakdown: {}
-        };
-        
-        // Analyze features if available
-        if (features.length) {
-          for (const feature of features) {
-            if (!feature.geometry) continue;
-            
-            // Count geometry types
-            const geomType = feature.geometry.type;
-            stats.geometryTypes[geomType] = (stats.geometryTypes[geomType] || 0) + 1;
-            
-            // Calculate area for polygons
-            if (['Polygon', 'MultiPolygon'].includes(geomType)) {
-              try {
-                stats.totalArea += turf.area(feature);
-              } catch (e) {}
-            }
-            
-            // Calculate length for lines
-            if (['LineString', 'MultiLineString'].includes(geomType)) {
-              try {
-                stats.totalLength += turf.length(feature, { units: 'kilometers' });
-              } catch (e) {}
-            }
-            
-            // Analyze first text property for breakdown
-            if (feature.properties && Object.keys(stats.attributeBreakdown).length === 0) {
-              const firstTextProp = Object.entries(feature.properties)
-                .find(([k, v]) => typeof v === 'string' && v.length < 50);
-              if (firstTextProp) {
-                stats.breakdownAttribute = firstTextProp[0];
-              }
-            }
-            
-            // Build attribute breakdown
-            if (stats.breakdownAttribute && feature.properties?.[stats.breakdownAttribute]) {
-              const val = feature.properties[stats.breakdownAttribute];
-              stats.attributeBreakdown[val] = (stats.attributeBreakdown[val] || 0) + 1;
-            }
-          }
-        }
-        
-        displayAnalysisResults(stats);
-        setAnalysisMode(null);
-        
-      } catch (error) {
-        console.error('Stats error:', error);
-        showAnalysisError('Could not calculate statistics: ' + error.message);
-      }
-    }
-
-    function showAnalysisLoading(message) {
-      const resultsSection = document.getElementById('analysis-results-section');
-      const resultsEl = document.getElementById('analysis-results');
-      
-      resultsSection.style.display = 'block';
-      resultsEl.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: var(--text-muted);">
-          <div class="spinner" style="margin: 0 auto 12px;"></div>
-          <div>${message}</div>
-        </div>
-      `;
-    }
-
-    function showAnalysisError(message) {
-      const resultsSection = document.getElementById('analysis-results-section');
-      const resultsEl = document.getElementById('analysis-results');
-      
-      resultsSection.style.display = 'block';
-      resultsEl.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: var(--orange);">
-          <div style="font-size: 2rem; margin-bottom: 8px;">⚠️</div>
-          <div>${escapeHtml(message)}</div>
-        </div>
-      `;
-    }
-
-    function displayAnalysisResults(results) {
-      const resultsSection = document.getElementById('analysis-results-section');
-      const resultsEl = document.getElementById('analysis-results');
-      
-      resultsSection.style.display = 'block';
-      
-      let html = '';
-      
-      switch (results.type) {
-        case 'buffer':
           html = `
-            <div class="result-summary">
-              <div class="result-stat">
-                <div class="result-stat-value">${results.featuresInBuffer}</div>
-                <div class="result-stat-label">Features in Buffer</div>
+            <h4>⭕ Buffer Query Results</h4>
+            <p style="font-size:0.75rem; color:#94a3b8; margin-bottom:12px;">
+              ${radiusKm}km radius around ${center.latitude.toFixed(4)}, ${center.longitude.toFixed(4)}
+            </p>
+            <div class="stat-grid">
+              <div class="stat-box">
+                <div class="stat-value">${countInBuffer.toLocaleString()}</div>
+                <div class="stat-label">In Buffer</div>
               </div>
-              <div class="result-stat">
-                <div class="result-stat-value">${results.percentage}%</div>
-                <div class="result-stat-label">of Total</div>
-              </div>
-              <div class="result-stat">
-                <div class="result-stat-value">${(results.radius / 1000).toFixed(1)}km</div>
-                <div class="result-stat-label">Buffer Radius</div>
-              </div>
-              <div class="result-stat">
-                <div class="result-stat-value">${results.totalFeatures}</div>
-                <div class="result-stat-label">Total Features</div>
+              <div class="stat-box">
+                <div class="stat-value">${pct}%</div>
+                <div class="stat-label">of Total (${totalCount.toLocaleString()})</div>
               </div>
             </div>
-            ${results.features.length ? `
-              <div class="result-breakdown">
-                <div class="result-breakdown-title">Features Found (first ${results.features.length})</div>
-                <div class="result-list">
-                  ${results.features.map(f => `
-                    <div class="result-item" data-feature-id="${f.id}" data-layer-id="${state.analysisLayer}">
-                      <span class="result-item-name">${escapeHtml(getFeatureName(f))}</span>
-                    </div>
-                  `).join('')}
-                </div>
+            ${features?.features?.length > 0 ? `
+              <div class="feature-list">
+                <strong>Sample features:</strong>
+                ${features.features.slice(0, 5).map(f => {
+                  const props = f.properties || {};
+                  const name = props.place || props.title || props.name || props.acq_date || f.id;
+                  return `<div class="feature-item">${name}</div>`;
+                }).join('')}
               </div>
             ` : ''}
           `;
-          break;
           
-        case 'nearest':
+        } else if (selectedTool === 'stats') {
+          // Layer stats
+          const agg = await felt.getAggregates({ layerId: selectedLayer });
+          
           html = `
-            <div class="result-summary">
-              <div class="result-stat">
-                <div class="result-stat-value">${results.found}</div>
-                <div class="result-stat-label">Features Found</div>
+            <h4>📊 Layer Statistics</h4>
+            <div class="stat-grid">
+              <div class="stat-box">
+                <div class="stat-value">${(agg?.count || 0).toLocaleString()}</div>
+                <div class="stat-label">Total Features</div>
               </div>
             </div>
-            <div class="result-list">
-              ${results.features.map((f, i) => `
-                <div class="result-item" data-feature-id="${f.id}" data-layer-id="${state.analysisLayer}">
-                  <span class="result-item-name">${i + 1}. ${escapeHtml(getFeatureName(f))}</span>
-                  <span class="result-item-value">${formatDistance(f.distance)}</span>
+          `;
+          
+          // Try to get numeric aggregations if we have schema
+          if (layerSchema?.attributes) {
+            const numericAttrs = layerSchema.attributes.filter(a => 
+              !a.startsWith('felt:') && 
+              ['brightness', 'mag', 'frp', 'confidence', 'population', 'area', 'value'].some(n => a.toLowerCase().includes(n))
+            );
+            
+            if (numericAttrs.length > 0) {
+              html += '<div style="margin-top:12px;">';
+              for (const attr of numericAttrs.slice(0, 3)) {
+                try {
+                  const stats = await felt.getAggregates({
+                    layerId: selectedLayer,
+                    aggregation: { method: 'avg', attribute: attr }
+                  });
+                  if (stats?.avg !== undefined) {
+                    html += `<div class="feature-item"><strong>${attr}:</strong> avg ${stats.avg.toFixed(2)}</div>`;
+                  }
+                } catch (e) {}
+              }
+              html += '</div>';
+            }
+          }
+          
+        } else if (selectedTool === 'categories') {
+          const attr = document.getElementById('cat-attribute').value;
+          
+          const cats = await felt.getCategoryData({
+            layerId: selectedLayer,
+            attribute: attr
+          });
+          
+          html = `
+            <h4>📋 Categories: ${attr}</h4>
+            <div class="feature-list">
+              ${(cats || []).slice(0, 15).map(c => `
+                <div class="feature-item">
+                  <strong>${c.value || '(empty)'}</strong>: ${c.count.toLocaleString()}
                 </div>
               `).join('')}
             </div>
           `;
-          break;
           
-        case 'pointQuery':
-          html = results.found === 0 
-            ? `<div style="text-align: center; padding: 20px; color: var(--text-muted);">
-                <div style="font-size: 2rem; margin-bottom: 8px;">🔍</div>
-                <div>No polygon contains this point</div>
-              </div>`
-            : `
-              <div class="result-summary">
-                <div class="result-stat">
-                  <div class="result-stat-value">${results.found}</div>
-                  <div class="result-stat-label">Containing Polygon${results.found > 1 ? 's' : ''}</div>
-                </div>
-              </div>
-              <div class="result-list">
-                ${results.features.map(f => `
-                  <div class="result-item" data-feature-id="${f.id}" data-layer-id="${state.analysisLayer}">
-                    <span class="result-item-name">${escapeHtml(getFeatureName(f))}</span>
-                  </div>
-                `).join('')}
-              </div>
-            `;
-          break;
+        } else if (selectedTool === 'histogram') {
+          const attr = document.getElementById('hist-attribute').value;
+          const bins = parseInt(document.getElementById('hist-bins').value) || 5;
           
-        case 'stats':
-          const geomTypesHtml = Object.entries(results.geometryTypes)
-            .map(([type, count]) => `<span>${type}: ${count}</span>`)
-            .join(' · ') || 'N/A';
+          const hist = await felt.getHistogramData({
+            layerId: selectedLayer,
+            attribute: attr,
+            steps: { type: 'jenks', count: bins }
+          });
           
-          const breakdownHtml = Object.keys(results.attributeBreakdown).length > 0
-            ? `
-              <div class="result-breakdown">
-                <div class="result-breakdown-title">Breakdown by ${results.breakdownAttribute}</div>
-                ${Object.entries(results.attributeBreakdown)
-                  .sort((a, b) => b[1] - a[1])
-                  .slice(0, 10)
-                  .map(([val, count]) => {
-                    const pct = (count / results.featureCount * 100);
-                    return `
-                      <div class="breakdown-bar">
-                        <span class="breakdown-label" title="${escapeHtml(val)}">${escapeHtml(val)}</span>
-                        <div class="breakdown-bar-container">
-                          <div class="breakdown-bar-fill" style="width: ${pct}%"></div>
-                        </div>
-                        <span class="breakdown-count">${count}</span>
-                      </div>
-                    `;
-                  }).join('')}
-              </div>
-            ` : '';
+          const maxCount = Math.max(...(hist || []).map(h => h.count));
           
           html = `
-            <div class="result-summary">
-              <div class="result-stat">
-                <div class="result-stat-value">${results.featureCount}</div>
-                <div class="result-stat-label">Features</div>
-              </div>
-              ${results.totalArea > 0 ? `
-                <div class="result-stat">
-                  <div class="result-stat-value">${formatArea(results.totalArea)}</div>
-                  <div class="result-stat-label">Total Area</div>
-                </div>
-              ` : ''}
-              ${results.totalLength > 0 ? `
-                <div class="result-stat">
-                  <div class="result-stat-value">${results.totalLength.toFixed(1)}km</div>
-                  <div class="result-stat-label">Total Length</div>
-                </div>
-              ` : ''}
+            <h4>📈 Histogram: ${attr}</h4>
+            <div class="feature-list">
+              ${(hist || []).map(h => {
+                const pct = maxCount > 0 ? (h.count / maxCount * 100) : 0;
+                return `
+                  <div class="feature-item">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                      <span>${h.min?.toFixed(1) || 0} - ${h.max?.toFixed(1) || 0}</span>
+                      <span>${h.count.toLocaleString()}</span>
+                    </div>
+                    <div style="background:#475569; height:8px; border-radius:4px;">
+                      <div style="background:#6366f1; height:100%; width:${pct}%; border-radius:4px;"></div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
-              Geometry types: ${geomTypesHtml}
-            </div>
-            ${breakdownHtml}
           `;
-          break;
-      }
-      
-      resultsEl.innerHTML = html;
-      
-      // Add click handlers for result items
-      resultsEl.querySelectorAll('.result-item').forEach(item => {
-        item.addEventListener('click', async () => {
-          const featureId = item.dataset.featureId;
-          const layerId = item.dataset.layerId;
-          if (featureId && layerId && state.felt) {
-            try {
-              await state.felt.setSelection({
-                selection: [{ type: 'feature', entity: { id: featureId, layerId } }]
-              });
-            } catch (e) {
-              console.log('Could not select feature:', e);
-            }
-          }
-        });
-      });
-    }
-
-    function clearAnalysisResults() {
-      document.getElementById('analysis-results-section').style.display = 'none';
-      cleanupAnalysisElements();
-    }
-
-    function getFeatureName(feature) {
-      if (!feature.properties) return `Feature ${feature.id?.substring(0, 8) || 'Unknown'}`;
-      
-      // Try common name fields
-      const nameFields = ['name', 'Name', 'NAME', 'title', 'Title', 'label', 'Label', 'id', 'ID'];
-      for (const field of nameFields) {
-        if (feature.properties[field]) {
-          return String(feature.properties[field]).substring(0, 50);
         }
+        
+        showResults(html);
+        setStatus('Analysis complete!', 'success');
+        
+      } catch (e) {
+        setStatus('Error: ' + e.message, 'error');
+        console.error(e);
+        showResults(`<div style="color:#f87171;">Error: ${e.message}</div>`);
       }
-      
-      // Return first string property
-      const firstString = Object.entries(feature.properties)
-        .find(([k, v]) => typeof v === 'string' && v.length > 0 && v.length < 50);
-      if (firstString) return firstString[1];
-      
-      return `Feature ${feature.id?.substring(0, 8) || 'Unknown'}`;
-    }
-
-    function formatDistance(meters) {
-      if (meters < 1000) return `${Math.round(meters)}m`;
-      return `${(meters / 1000).toFixed(1)}km`;
-    }
-
-    function formatArea(sqMeters) {
-      if (sqMeters < 10000) return `${Math.round(sqMeters)}m²`;
-      if (sqMeters < 1000000) return `${(sqMeters / 10000).toFixed(1)}ha`;
-      return `${(sqMeters / 1000000).toFixed(1)}km²`;
-    }
-
-    // ============================================
-    // EVENT LISTENERS
-    // ============================================
-    document.getElementById('refresh-btn').addEventListener('click', refreshSDK);
-    document.getElementById('action-fit').addEventListener('click', zoomToFit);
-    document.getElementById('action-toggle').addEventListener('click', toggleAllLayers);
-    document.getElementById('action-clear').addEventListener('click', clearSelection);
-    document.getElementById('action-table').addEventListener('click', showDataTable);
-
-    // Load map button
-    document.getElementById('load-map-btn').addEventListener('click', loadMapFromInput);
-
-    // Enter key to load map
-    document.getElementById('map-url-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') loadMapFromInput();
-    });
-
-    // Analysis tool buttons
-    document.getElementById('tool-buffer').addEventListener('click', () => {
-      if (!state.analysisLayer) {
-        alert('Please select a layer first');
-        return;
-      }
-      setAnalysisMode('buffer');
-    });
-
-    document.getElementById('tool-nearest').addEventListener('click', () => {
-      if (!state.analysisLayer) {
-        alert('Please select a layer first');
-        return;
-      }
-      setAnalysisMode('nearest');
-    });
-
-    document.getElementById('tool-stats').addEventListener('click', () => {
-      if (!state.analysisLayer) {
-        alert('Please select a layer first');
-        return;
-      }
-      setAnalysisMode('stats');
-    });
-
-    document.getElementById('tool-point-query').addEventListener('click', () => {
-      if (!state.analysisLayer) {
-        alert('Please select a layer first');
-        return;
-      }
-      setAnalysisMode('pointQuery');
-    });
-
-    document.getElementById('cancel-analysis').addEventListener('click', cancelAnalysis);
-    document.getElementById('clear-results').addEventListener('click', clearAnalysisResults);
-
-    document.getElementById('run-analysis').addEventListener('click', () => {
-      if (!state.viewport || !state.analysisMode) return;
-      handleAnalysisClick();
-    });
-
-    document.getElementById('analysis-layer-select').addEventListener('change', (e) => {
-      state.analysisLayer = e.target.value || null;
-    });
-
-    // ============================================
-    // INIT
-    // ============================================
-    loadRecentMaps();
+    };
+    
+    // Pre-fill with test map
+    document.getElementById('map-url').value = 'https://felt.com/map/Living-Earth-Animated-Pulse-Map-zH0ZvXraQTep7nfT1L4kSD';
   </script>
 </body>
 </html>
