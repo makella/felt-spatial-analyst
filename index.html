@@ -1711,30 +1711,29 @@
       if (!state.felt) return [];
       
       try {
-        // Paginate through all features
+        // Paginate through all features (SDK returns 20 per page)
         let allFeatures = [];
-        let nextPage = null;
+        let pagination = undefined;
         let pageCount = 0;
-        const maxPages = 50; // Safety limit to prevent infinite loops
+        const maxPages = 250; // 250 pages * 20 = 5000 features max
         
         do {
-          const params = { layerId, pageSize: 100 }; // Request larger pages
-          if (nextPage) {
-            params.pagination = nextPage;
-          }
+          const result = await state.felt.getFeatures({
+            layerId: layerId,
+            pagination: pagination
+          });
           
-          const result = await state.felt.getFeatures(params);
           const features = result?.features || [];
           allFeatures = allFeatures.concat(features);
-          nextPage = result?.nextPage || null;
+          pagination = result?.nextPage || null;
           pageCount++;
           
           // Log progress for large datasets
-          if (pageCount % 5 === 0) {
+          if (pageCount % 10 === 0) {
             console.log(`Fetched ${allFeatures.length} features so far (page ${pageCount})...`);
           }
           
-        } while (nextPage && pageCount < maxPages);
+        } while (pagination && pageCount < maxPages);
         
         if (pageCount >= maxPages) {
           console.warn(`Stopped at ${maxPages} pages (${allFeatures.length} features). Dataset may be truncated.`);
@@ -1745,7 +1744,7 @@
         // Normalize features - extract geometry from properties if needed
         return allFeatures.map(f => normalizeFeatureGeometry(f));
       } catch (e) {
-        console.log('getFeatures not available, trying alternative:', e);
+        console.log('getFeatures error:', e);
         return [];
       }
     }
