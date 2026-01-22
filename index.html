@@ -1759,7 +1759,7 @@
           ...feature,
           geometry: {
             type: 'Point',
-            coordinates: [lng, lat]
+            coordinates: [Number(lng), Number(lat)]  // Ensure they're numbers
           }
         };
       }
@@ -1821,9 +1821,16 @@
           if (!feature.geometry || !feature.geometry.coordinates) continue;
           
           try {
+            // Ensure coordinates are numbers
+            const coords = feature.geometry.coordinates;
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            
+            if (isNaN(lng) || isNaN(lat)) continue;
+            
             // Check if feature intersects buffer
             const featureGeom = feature.geometry.type === 'Point' 
-              ? turf.point(feature.geometry.coordinates)
+              ? turf.point([lng, lat])
               : feature;
             
             if (turf.booleanIntersects(buffer, featureGeom)) {
@@ -1831,6 +1838,7 @@
             }
           } catch (e) {
             // Skip invalid geometries
+            console.log('Buffer intersect error:', e);
           }
         }
         
@@ -1895,14 +1903,24 @@
           .map(feature => {
             let distance;
             try {
+              // Ensure coordinates are numbers
+              const coords = feature.geometry.coordinates;
+              const lng = Number(coords[0]);
+              const lat = Number(coords[1]);
+              
+              if (isNaN(lng) || isNaN(lat)) {
+                return { ...feature, distance: Infinity };
+              }
+              
               if (feature.geometry.type === 'Point') {
-                distance = turf.distance(centerPoint, turf.point(feature.geometry.coordinates), { units: 'meters' });
+                distance = turf.distance(centerPoint, turf.point([lng, lat]), { units: 'meters' });
               } else {
                 // For polygons/lines, get centroid
                 const centroid = turf.centroid(feature);
                 distance = turf.distance(centerPoint, centroid, { units: 'meters' });
               }
             } catch (e) {
+              console.log('Distance calc error:', e);
               distance = Infinity;
             }
             return { ...feature, distance };
