@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Felt SDK Diagnostic</title>
+  <style>
+    body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 20px; }
+    #map { width: 100%; height: 300px; border: 1px solid #444; margin-bottom: 20px; }
+    pre { background: #0d0d1a; padding: 15px; border-radius: 8px; overflow: auto; max-height: 400px; font-size: 12px; }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+    .info { color: #60a5fa; }
+    h2 { color: #a78bfa; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <h1>🔬 Felt SDK Feature Access Diagnostic</h1>
+  <div id="map"></div>
+  <pre id="output">Loading...</pre>
+  
+  <script type="module">
+    import { Felt } from "https://esm.run/@feltmaps/js-sdk";
+    
+    const output = document.getElementById('output');
+    output.textContent = '';
+    
+    function log(msg, type = '') {
+      const span = document.createElement('span');
+      span.className = type;
+      span.textContent = msg + '\n';
+      output.appendChild(span);
+    }
+    
+    async function diagnose() {
+      const mapId = 'zH0ZvXraQTep7nfT1L4kSD';
+      
+      log('═══════════════════════════════════════════════════════════', 'info');
+      log('  FELT SDK DIAGNOSTIC - Living Earth Animated Pulse Map', 'info');
+      log('═══════════════════════════════════════════════════════════', 'info');
+      
+      try {
+        log('\n[1] Embedding map...', 'info');
+        const felt = await Felt.embed(document.getElementById('map'), mapId);
+        log('✓ Map embedded successfully', 'success');
+        
+        // Get viewport
+        const vp = await felt.getViewport();
+        log(`\n[2] Viewport: ${vp.center.latitude.toFixed(4)}, ${vp.center.longitude.toFixed(4)} (zoom ${vp.zoom.toFixed(1)})`, 'info');
+        
+        // Get layers
+        log('\n[3] Getting layers...', 'info');
+        const layers = await felt.getLayers();
+        log(`✓ Found ${layers.length} layer(s)`, 'success');
+        
+        for (let i = 0; i < layers.length; i++) {
+          const layer = layers[i];
+          log(`\n${'─'.repeat(50)}`);
+          log(`LAYER ${i + 1}: ${layer.name || '(unnamed)'}`, 'info');
+          log(`  ID: ${layer.id}`);
+          log(`  Type: ${layer.type || 'unknown'}`);
+          log(`  Visible: ${layer.visible}`);
+          
+          // Try getFeatures
+          log('\n  Testing getFeatures()...', 'info');
+          try {
+            const result = await felt.getFeatures({ layerId: layer.id });
+            if (result && result.features && result.features.length > 0) {
+              log(`  ✓ Got ${result.features.length} features!`, 'success');
+              
+              const sample = result.features[0];
+              log(`\n  Sample feature:`);
+              log(`    Geometry type: ${sample.geometry?.type || 'NONE'}`);
+              log(`    Has coordinates: ${!!sample.geometry?.coordinates}`);
+              log(`    Properties: ${JSON.stringify(Object.keys(sample.properties || {}))}`);
+              
+              if (sample.geometry?.coordinates) {
+                const coords = sample.geometry.coordinates;
+                if (sample.geometry.type === 'Point') {
+                  log(`    Coords: [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]`);
+                } else {
+                  log(`    Coords array length: ${Array.isArray(coords[0]) ? coords.length : 'nested'}`);
+                }
+              }
+            } else {
+              log(`  ⚠ getFeatures returned empty or null`, 'error');
+              log(`    Raw result: ${JSON.stringify(result)}`);
+            }
+          } catch (e) {
+            log(`  ✗ getFeatures failed: ${e.message}`, 'error');
+          }
+          
+          // Try getAggregates
+          log('\n  Testing getAggregates()...', 'info');
+          try {
+            const agg = await felt.getAggregates({
+              layerId: layer.id,
+              calculations: [{ type: 'count' }]
+            });
+            log(`  ✓ Aggregates: ${JSON.stringify(agg)}`, 'success');
+          } catch (e) {
+            log(`  ✗ getAggregates failed: ${e.message}`, 'error');
+          }
+          
+          // Try getLayerSchema
+          log('\n  Testing getLayerSchema()...', 'info');
+          try {
+            const schema = await felt.getLayerSchema({ layerId: layer.id });
+            if (schema && schema.properties) {
+              log(`  ✓ Schema properties: ${JSON.stringify(Object.keys(schema.properties))}`, 'success');
+            } else {
+              log(`  ⚠ Schema empty: ${JSON.stringify(schema)}`);
+            }
+          } catch (e) {
+            log(`  ✗ getLayerSchema failed: ${e.message}`, 'error');
+          }
+        }
+        
+        log('\n' + '═'.repeat(50), 'info');
+        log('DIAGNOSTIC COMPLETE', 'info');
+        log('═'.repeat(50), 'info');
+        
+      } catch (e) {
+        log(`\n✗ Fatal error: ${e.message}`, 'error');
+        console.error(e);
+      }
+    }
+    
+    diagnose();
+  </script>
+</body>
+</html>
