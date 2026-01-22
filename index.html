@@ -1822,50 +1822,45 @@
         const radiusKm = state.bufferRadius / 1000;
         const buffer = turf.buffer(centerPoint, radiusKm, { units: 'kilometers' });
         
-        // Get all features from the layer
-        const features = await getAllLayerFeatures(state.analysisLayer);
+        // Calculate bounding box for the buffer
+        const bbox = turf.bbox(buffer);
+        // bbox is [minX, minY, maxX, maxY] = [minLng, minLat, maxLng, maxLat]
+        const boundary = bbox; // SDK uses same format
         
-        if (!features.length) {
-          showAnalysisError('Could not retrieve features from layer. Try using Layer Stats instead.');
-          return;
-        }
+        // Get total count first (no boundary filter)
+        let totalFeatures = 0;
+        let totalPagination = undefined;
+        do {
+          const result = await state.felt.getFeatures({
+            layerId: state.analysisLayer,
+            pagination: totalPagination
+          });
+          totalFeatures += (result?.features || []).length;
+          totalPagination = result?.nextPage;
+        } while (totalPagination);
         
-        // Find features within buffer
-        const featuresInBuffer = [];
-        for (const feature of features) {
-          if (!feature.geometry || !feature.geometry.coordinates) continue;
-          
-          try {
-            // Ensure coordinates are numbers
-            const coords = feature.geometry.coordinates;
-            const lng = Number(coords[0]);
-            const lat = Number(coords[1]);
-            
-            if (isNaN(lng) || isNaN(lat)) continue;
-            
-            // Check if feature intersects buffer
-            const featureGeom = feature.geometry.type === 'Point' 
-              ? turf.point([lng, lat])
-              : feature;
-            
-            if (turf.booleanIntersects(buffer, featureGeom)) {
-              featuresInBuffer.push(feature);
-            }
-          } catch (e) {
-            // Skip invalid geometries
-            console.log('Buffer intersect error:', e);
-          }
-        }
+        // Now get features within the bounding box (server-side spatial filter!)
+        let featuresInBuffer = 0;
+        let bufferPagination = undefined;
+        do {
+          const result = await state.felt.getFeatures({
+            layerId: state.analysisLayer,
+            boundary: boundary,
+            pagination: bufferPagination
+          });
+          featuresInBuffer += (result?.features || []).length;
+          bufferPagination = result?.nextPage;
+        } while (bufferPagination);
         
         // Calculate stats
         const results = {
           type: 'buffer',
           center: center,
           radius: state.bufferRadius,
-          totalFeatures: features.length,
-          featuresInBuffer: featuresInBuffer.length,
-          percentage: ((featuresInBuffer.length / features.length) * 100).toFixed(1),
-          features: featuresInBuffer.slice(0, 20) // Limit to first 20 for display
+          totalFeatures: totalFeatures,
+          featuresInBuffer: featuresInBuffer,
+          percentage: totalFeatures > 0 ? ((featuresInBuffer / totalFeatures) * 100).toFixed(1) : '0.0',
+          features: [] // Not fetching full feature list anymore
         };
         
         // Try to draw the buffer on the map
