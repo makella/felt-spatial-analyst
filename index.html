@@ -1830,14 +1830,16 @@
         // Use getAggregates for server-side counts - this is the proper SDK approach!
         // Get total count (no boundary filter)
         const totalResult = await state.felt.getAggregates({
-          layerId: state.analysisLayer
+          layerId: state.analysisLayer,
+          aggregation: { method: "count" }
         });
         const totalFeatures = totalResult?.count || 0;
         
         // Get count within the bounding box
         const bufferResult = await state.felt.getAggregates({
           layerId: state.analysisLayer,
-          boundary: boundary
+          boundary: boundary,
+          aggregation: { method: "count" }
         });
         const featuresInBuffer = bufferResult?.count || 0;
         
@@ -2001,7 +2003,8 @@
       try {
         // Use getAggregates for server-side count (much faster!)
         const aggregateResult = await state.felt.getAggregates({
-          layerId: state.analysisLayer
+          layerId: state.analysisLayer,
+          aggregation: { method: "count" }
         });
         
         const featureCount = aggregateResult?.count || 0;
