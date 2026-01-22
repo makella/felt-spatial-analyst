@@ -1713,11 +1713,59 @@
       try {
         // Try to get features using getFeatures method
         const result = await state.felt.getFeatures({ layerId });
-        return result?.features || [];
+        const features = result?.features || [];
+        
+        // Normalize features - extract geometry from properties if needed
+        return features.map(f => normalizeFeatureGeometry(f));
       } catch (e) {
         console.log('getFeatures not available, trying alternative:', e);
         return [];
       }
+    }
+
+    // Handle features where geometry is null but lat/lng are in properties
+    function normalizeFeatureGeometry(feature) {
+      // If geometry already exists, return as-is
+      if (feature.geometry && feature.geometry.coordinates) {
+        return feature;
+      }
+      
+      // Try to extract lat/lng from properties
+      const props = feature.properties || {};
+      
+      // Common field names for coordinates
+      const latFields = ['latitude', 'lat', 'Latitude', 'LAT', 'y', 'Y'];
+      const lngFields = ['longitude', 'lng', 'lon', 'Longitude', 'LNG', 'LON', 'x', 'X'];
+      
+      let lat = null, lng = null;
+      
+      for (const field of latFields) {
+        if (props[field] !== undefined && props[field] !== null) {
+          lat = parseFloat(props[field]);
+          break;
+        }
+      }
+      
+      for (const field of lngFields) {
+        if (props[field] !== undefined && props[field] !== null) {
+          lng = parseFloat(props[field]);
+          break;
+        }
+      }
+      
+      // If we found valid coordinates, create a Point geometry
+      if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+        return {
+          ...feature,
+          geometry: {
+            type: 'Point',
+            coordinates: [lng, lat]
+          }
+        };
+      }
+      
+      // Return original if we can't extract geometry
+      return feature;
     }
 
     async function handleAnalysisClick(event) {
@@ -1770,7 +1818,7 @@
         // Find features within buffer
         const featuresInBuffer = [];
         for (const feature of features) {
-          if (!feature.geometry) continue;
+          if (!feature.geometry || !feature.geometry.coordinates) continue;
           
           try {
             // Check if feature intersects buffer
@@ -1843,7 +1891,7 @@
         
         // Calculate distances and sort
         const withDistances = features
-          .filter(f => f.geometry)
+          .filter(f => f.geometry && f.geometry.coordinates)
           .map(feature => {
             let distance;
             try {
