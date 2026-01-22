@@ -1824,33 +1824,22 @@
         
         // Calculate bounding box for the buffer
         const bbox = turf.bbox(buffer);
-        // bbox is [minX, minY, maxX, maxY] = [minLng, minLat, maxLng, maxLat]
-        const boundary = bbox; // SDK uses same format
+        // bbox is [minLng, minLat, maxLng, maxLat]
+        const boundary = bbox;
         
-        // Get total count first (no boundary filter)
-        let totalFeatures = 0;
-        let totalPagination = undefined;
-        do {
-          const result = await state.felt.getFeatures({
-            layerId: state.analysisLayer,
-            pagination: totalPagination
-          });
-          totalFeatures += (result?.features || []).length;
-          totalPagination = result?.nextPage;
-        } while (totalPagination);
+        // Use getAggregates for server-side counts - this is the proper SDK approach!
+        // Get total count (no boundary filter)
+        const totalResult = await state.felt.getAggregates({
+          layerId: state.analysisLayer
+        });
+        const totalFeatures = totalResult?.count || 0;
         
-        // Now get features within the bounding box (server-side spatial filter!)
-        let featuresInBuffer = 0;
-        let bufferPagination = undefined;
-        do {
-          const result = await state.felt.getFeatures({
-            layerId: state.analysisLayer,
-            boundary: boundary,
-            pagination: bufferPagination
-          });
-          featuresInBuffer += (result?.features || []).length;
-          bufferPagination = result?.nextPage;
-        } while (bufferPagination);
+        // Get count within the bounding box
+        const bufferResult = await state.felt.getAggregates({
+          layerId: state.analysisLayer,
+          boundary: boundary
+        });
+        const featuresInBuffer = bufferResult?.count || 0;
         
         // Calculate stats
         const results = {
@@ -1860,7 +1849,7 @@
           totalFeatures: totalFeatures,
           featuresInBuffer: featuresInBuffer,
           percentage: totalFeatures > 0 ? ((featuresInBuffer / totalFeatures) * 100).toFixed(1) : '0.0',
-          features: [] // Not fetching full feature list anymore
+          features: []
         };
         
         // Try to draw the buffer on the map
@@ -2010,58 +1999,33 @@
       showAnalysisLoading('Calculating layer statistics...');
       
       try {
-        // Get all features
-        const features = await getAllLayerFeatures(state.analysisLayer);
+        // Use getAggregates for server-side count (much faster!)
+        const aggregateResult = await state.felt.getAggregates({
+          layerId: state.analysisLayer
+        });
         
-        // Calculate statistics
+        const featureCount = aggregateResult?.count || 0;
+        
+        // Get layer info for additional context
+        const layers = await state.felt.getLayers();
+        const layer = layers.find(l => l.id === state.analysisLayer);
+        
+        // Try to get schema for attribute info
+        let schema = null;
+        try {
+          schema = await state.felt.getLayerSchema({ layerId: state.analysisLayer });
+        } catch (e) {
+          console.log('Could not get schema:', e);
+        }
+        
         const stats = {
           type: 'stats',
-          featureCount: features.length,
-          geometryTypes: {},
-          totalArea: 0,
-          totalLength: 0,
-          attributeBreakdown: {}
+          featureCount: featureCount,
+          layerName: layer?.name || 'Unknown Layer',
+          geometryType: layer?.geometryType || 'Unknown',
+          attributes: schema?.attributes ? Object.keys(schema.attributes).length : 'Unknown',
+          attributeList: schema?.attributes ? Object.keys(schema.attributes).slice(0, 10) : []
         };
-        
-        // Analyze features if available
-        if (features.length) {
-          for (const feature of features) {
-            if (!feature.geometry) continue;
-            
-            // Count geometry types
-            const geomType = feature.geometry.type;
-            stats.geometryTypes[geomType] = (stats.geometryTypes[geomType] || 0) + 1;
-            
-            // Calculate area for polygons
-            if (['Polygon', 'MultiPolygon'].includes(geomType)) {
-              try {
-                stats.totalArea += turf.area(feature);
-              } catch (e) {}
-            }
-            
-            // Calculate length for lines
-            if (['LineString', 'MultiLineString'].includes(geomType)) {
-              try {
-                stats.totalLength += turf.length(feature, { units: 'kilometers' });
-              } catch (e) {}
-            }
-            
-            // Analyze first text property for breakdown
-            if (feature.properties && Object.keys(stats.attributeBreakdown).length === 0) {
-              const firstTextProp = Object.entries(feature.properties)
-                .find(([k, v]) => typeof v === 'string' && v.length < 50);
-              if (firstTextProp) {
-                stats.breakdownAttribute = firstTextProp[0];
-              }
-            }
-            
-            // Build attribute breakdown
-            if (stats.breakdownAttribute && feature.properties?.[stats.breakdownAttribute]) {
-              const val = feature.properties[stats.breakdownAttribute];
-              stats.attributeBreakdown[val] = (stats.attributeBreakdown[val] || 0) + 1;
-            }
-          }
-        }
         
         displayAnalysisResults(stats);
         setAnalysisMode(null);
@@ -2185,55 +2149,35 @@
           break;
           
         case 'stats':
-          const geomTypesHtml = Object.entries(results.geometryTypes)
-            .map(([type, count]) => `<span>${type}: ${count}</span>`)
-            .join(' · ') || 'N/A';
-          
-          const breakdownHtml = Object.keys(results.attributeBreakdown).length > 0
+          const attributeListHtml = results.attributeList && results.attributeList.length > 0
             ? `
               <div class="result-breakdown">
-                <div class="result-breakdown-title">Breakdown by ${results.breakdownAttribute}</div>
-                ${Object.entries(results.attributeBreakdown)
-                  .sort((a, b) => b[1] - a[1])
-                  .slice(0, 10)
-                  .map(([val, count]) => {
-                    const pct = (count / results.featureCount * 100);
-                    return `
-                      <div class="breakdown-bar">
-                        <span class="breakdown-label" title="${escapeHtml(val)}">${escapeHtml(val)}</span>
-                        <div class="breakdown-bar-container">
-                          <div class="breakdown-bar-fill" style="width: ${pct}%"></div>
-                        </div>
-                        <span class="breakdown-count">${count}</span>
-                      </div>
-                    `;
-                  }).join('')}
+                <div class="result-breakdown-title">Attributes (first 10)</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                  ${results.attributeList.map(attr => `<span style="display: inline-block; background: rgba(99,102,241,0.2); padding: 2px 8px; margin: 2px; border-radius: 4px;">${escapeHtml(attr)}</span>`).join('')}
+                </div>
               </div>
             ` : '';
           
           html = `
             <div class="result-summary">
               <div class="result-stat">
-                <div class="result-stat-value">${results.featureCount}</div>
-                <div class="result-stat-label">Features</div>
+                <div class="result-stat-value">${results.featureCount.toLocaleString()}</div>
+                <div class="result-stat-label">Total Features</div>
               </div>
-              ${results.totalArea > 0 ? `
-                <div class="result-stat">
-                  <div class="result-stat-value">${formatArea(results.totalArea)}</div>
-                  <div class="result-stat-label">Total Area</div>
-                </div>
-              ` : ''}
-              ${results.totalLength > 0 ? `
-                <div class="result-stat">
-                  <div class="result-stat-value">${results.totalLength.toFixed(1)}km</div>
-                  <div class="result-stat-label">Total Length</div>
-                </div>
-              ` : ''}
+              <div class="result-stat">
+                <div class="result-stat-value">${results.geometryType}</div>
+                <div class="result-stat-label">Geometry Type</div>
+              </div>
+              <div class="result-stat">
+                <div class="result-stat-value">${results.attributes}</div>
+                <div class="result-stat-label">Attributes</div>
+              </div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
-              Geometry types: ${geomTypesHtml}
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+              <strong>Layer:</strong> ${escapeHtml(results.layerName)}
             </div>
-            ${breakdownHtml}
+            ${attributeListHtml}
           `;
           break;
       }
