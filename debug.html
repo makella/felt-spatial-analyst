@@ -3,315 +3,373 @@
 <head>
   <title>Felt Analysis Debug</title>
   <style>
-    body { font-family: system-ui; background: #1a1a2e; color: #eee; padding: 20px; }
-    #map { width: 100%; height: 250px; border: 1px solid #444; margin-bottom: 10px; }
-    .controls { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-    button { padding: 8px 16px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer; }
-    button:hover { background: #4f46e5; }
-    select { padding: 8px; border-radius: 6px; background: #2a2a3e; color: white; border: 1px solid #444; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+    #map { width: 100%; height: 300px; border: 1px solid #444; margin-bottom: 20px; }
     pre { background: #0d0d1a; padding: 15px; border-radius: 8px; overflow: auto; max-height: 400px; font-size: 11px; white-space: pre-wrap; }
     .success { color: #4ade80; }
     .error { color: #f87171; }
     .info { color: #60a5fa; }
     .warn { color: #fbbf24; }
+    button { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 5px; }
+    button:hover { background: #4f46e5; }
+    select { padding: 8px; border-radius: 6px; background: #2a2a3e; color: white; border: 1px solid #444; }
+    .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <h1>🔧 Felt Spatial Analysis - Debug Console</h1>
+  <h1>🔧 Felt Analysis Debug Tool</h1>
+  
+  <div class="controls">
+    <input type="text" id="map-url" placeholder="Paste Felt map URL" style="flex:1; min-width:300px; padding:8px; border-radius:6px; background:#2a2a3e; color:white; border:1px solid #444;">
+    <button onclick="loadMap()">Load Map</button>
+  </div>
+  
   <div id="map"></div>
   
   <div class="controls">
-    <select id="layer-select"><option value="">Loading layers...</option></select>
+    <select id="layer-select">
+      <option value="">Select a layer...</option>
+    </select>
     <button onclick="testGetFeatures()">1. Test getFeatures()</button>
     <button onclick="testNormalization()">2. Test Normalization</button>
     <button onclick="testNearest()">3. Test Nearest</button>
     <button onclick="testBuffer()">4. Test Buffer</button>
-    <button onclick="clearLog()">Clear Log</button>
   </div>
   
-  <pre id="output"></pre>
+  <pre id="output">Paste a Felt map URL and click "Load Map" to start...</pre>
   
   <script type="module">
     import { Felt } from "https://esm.run/@feltmaps/js-sdk";
     import * as turf from "https://esm.run/@turf/turf";
     
-    // Make available globally for button onclick
-    window.turf = turf;
-    
-    const output = document.getElementById('output');
     let felt = null;
     let layers = [];
-    let viewport = null;
+    let currentFeatures = [];
+    let normalizedFeatures = [];
     
-    window.clearLog = () => { output.innerHTML = ''; };
+    const output = document.getElementById('output');
     
     function log(msg, type = '') {
-      const time = new Date().toLocaleTimeString();
-      const span = document.createElement('span');
-      span.className = type;
-      span.textContent = `[${time}] ${msg}\n`;
-      output.appendChild(span);
+      const line = document.createElement('div');
+      line.className = type;
+      line.textContent = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+      output.appendChild(line);
       output.scrollTop = output.scrollHeight;
-      console.log(msg);
     }
     
-    function logObj(label, obj) {
-      log(`${label}:`, 'info');
-      log(JSON.stringify(obj, null, 2));
+    function clear() {
+      output.innerHTML = '';
     }
     
-    // Initialize
-    async function init() {
-      const mapId = 'zH0ZvXraQTep7nfT1L4kSD';
-      log('Initializing with map: ' + mapId, 'info');
+    function extractMapId(input) {
+      const urlMatch = input.match(/felt\.com\/map\/[^\/]+-([a-zA-Z0-9]+)/);
+      if (urlMatch) return urlMatch[1];
+      if (/^[a-zA-Z0-9]+$/.test(input.trim())) return input.trim();
+      return null;
+    }
+    
+    window.loadMap = async function() {
+      clear();
+      const url = document.getElementById('map-url').value;
+      const mapId = extractMapId(url);
+      
+      if (!mapId) {
+        log('❌ Invalid map URL', 'error');
+        return;
+      }
+      
+      log(`Loading map: ${mapId}...`, 'info');
       
       try {
+        document.getElementById('map').innerHTML = '';
         felt = await Felt.embed(document.getElementById('map'), mapId);
-        window.felt = felt;
-        log('✓ Map embedded', 'success');
+        log('✅ Map embedded', 'success');
         
-        viewport = await felt.getViewport();
-        window.viewport = viewport;
-        log(`✓ Viewport: ${viewport.center.latitude.toFixed(4)}, ${viewport.center.longitude.toFixed(4)}`, 'success');
+        // Get viewport
+        const vp = await felt.getViewport();
+        log(`📍 Viewport: ${vp.center.latitude.toFixed(4)}, ${vp.center.longitude.toFixed(4)} (zoom ${vp.zoom.toFixed(1)})`, 'info');
         
-        layers = await felt.getLayers();
-        window.layers = layers;
-        log(`✓ Found ${layers.length} layers`, 'success');
+        // Get layers
+        layers = await felt.getLayers() || [];
+        log(`📑 Found ${layers.length} layers`, 'success');
         
+        // Populate dropdown
         const select = document.getElementById('layer-select');
         select.innerHTML = '<option value="">Select a layer...</option>';
-        layers.forEach((l, i) => {
+        layers.forEach((layer, i) => {
           const opt = document.createElement('option');
-          opt.value = l.id;
-          opt.textContent = l.name || `Layer ${i+1}`;
+          opt.value = layer.id;
+          opt.textContent = `${i+1}. ${layer.name || layer.id}`;
           select.appendChild(opt);
         });
         
-        // Listen for viewport changes
-        felt.onViewportMoveEnd({ handler: (vp) => {
-          viewport = vp;
-          window.viewport = vp;
-        }});
-        
-        log('\n✓ Ready! Select a layer and click test buttons.\n', 'success');
+        log('\n✅ Ready! Select a layer and click the test buttons.', 'success');
         
       } catch (e) {
-        log('✗ Init failed: ' + e.message, 'error');
-        console.error(e);
-      }
-    }
-    
-    // Test 1: Raw getFeatures
-    window.testGetFeatures = async () => {
-      const layerId = document.getElementById('layer-select').value;
-      if (!layerId) { log('Please select a layer first', 'error'); return; }
-      
-      log('\n═══ TEST: getFeatures() ═══', 'info');
-      log('Layer ID: ' + layerId);
-      
-      try {
-        const result = await felt.getFeatures({ layerId });
-        log(`\nRaw result type: ${typeof result}`, 'info');
-        log(`result.features exists: ${!!result?.features}`);
-        log(`result.features length: ${result?.features?.length || 0}`);
-        
-        if (result?.features?.length > 0) {
-          const f = result.features[0];
-          log('\n--- First feature ---', 'info');
-          log(`ID: ${f.id}`);
-          log(`geometry: ${JSON.stringify(f.geometry)}`);
-          log(`properties keys: ${Object.keys(f.properties || {}).join(', ')}`);
-          
-          if (f.properties) {
-            log('\n--- Property values (first feature) ---', 'info');
-            for (const [k, v] of Object.entries(f.properties)) {
-              log(`  ${k}: ${v} (${typeof v})`);
-            }
-          }
-          
-          window.lastFeatures = result.features;
-          log('\n✓ Features saved to window.lastFeatures', 'success');
-        }
-      } catch (e) {
-        log('✗ getFeatures failed: ' + e.message, 'error');
+        log(`❌ Error: ${e.message}`, 'error');
         console.error(e);
       }
     };
     
-    // Test 2: Normalization
-    window.testNormalization = async () => {
+    window.testGetFeatures = async function() {
+      clear();
       const layerId = document.getElementById('layer-select').value;
-      if (!layerId) { log('Please select a layer first', 'error'); return; }
+      if (!layerId) {
+        log('❌ Select a layer first', 'error');
+        return;
+      }
       
-      log('\n═══ TEST: Geometry Normalization ═══', 'info');
+      log(`\n===== TEST 1: getFeatures() =====\n`, 'info');
+      log(`Layer ID: ${layerId}`);
       
       try {
+        log('\nCalling felt.getFeatures({ layerId })...', 'info');
         const result = await felt.getFeatures({ layerId });
-        const features = result?.features || [];
         
-        log(`Raw features: ${features.length}`);
+        log(`\nResult type: ${typeof result}`);
+        log(`Result keys: ${Object.keys(result || {})}`);
         
-        let withNativeGeom = 0;
-        let withExtractedGeom = 0;
-        let noGeom = 0;
-        const normalized = [];
+        if (result && result.features) {
+          currentFeatures = result.features;
+          log(`\n✅ Got ${currentFeatures.length} features`, 'success');
+          
+          if (currentFeatures.length > 0) {
+            log('\n--- First feature structure ---', 'info');
+            const f = currentFeatures[0];
+            log(`Keys: ${Object.keys(f)}`);
+            log(`\nfeature.id: ${f.id}`);
+            log(`feature.type: ${f.type}`);
+            log(`feature.geometry: ${JSON.stringify(f.geometry)}`);
+            log(`feature.properties keys: ${Object.keys(f.properties || {})}`);
+            log(`\nfeature.properties sample:`);
+            const props = f.properties || {};
+            Object.entries(props).slice(0, 10).forEach(([k, v]) => {
+              log(`  ${k}: ${v} (${typeof v})`);
+            });
+          }
+        } else {
+          log(`\n❌ No features returned`, 'error');
+          log(`Raw result: ${JSON.stringify(result)}`);
+        }
+      } catch (e) {
+        log(`\n❌ getFeatures failed: ${e.message}`, 'error');
+        console.error(e);
+      }
+    };
+    
+    window.testNormalization = async function() {
+      clear();
+      log(`\n===== TEST 2: Geometry Normalization =====\n`, 'info');
+      
+      if (!currentFeatures.length) {
+        log('❌ Run Test 1 first to load features', 'error');
+        return;
+      }
+      
+      log(`Processing ${currentFeatures.length} features...`);
+      
+      normalizedFeatures = [];
+      let stats = { native: 0, extracted: 0, failed: 0 };
+      
+      for (const feature of currentFeatures) {
+        // Check for native geometry
+        if (feature.geometry && feature.geometry.coordinates) {
+          normalizedFeatures.push(feature);
+          stats.native++;
+          continue;
+        }
         
-        for (const f of features) {
-          // Check native geometry
-          if (f.geometry && f.geometry.coordinates) {
-            withNativeGeom++;
-            normalized.push(f);
+        // Try to extract from properties
+        const props = feature.properties || {};
+        
+        // Log what we're looking for in first feature
+        if (normalizedFeatures.length === 0 && stats.failed === 0) {
+          log('\n--- Searching for coordinates in properties ---', 'info');
+          log(`Looking for lat fields: latitude, lat, Latitude, LAT, y, Y`);
+          log(`Looking for lng fields: longitude, lng, lon, Longitude, LNG, LON, x, X`);
+          log(`\nActual property values:`);
+          ['latitude', 'lat', 'Latitude', 'longitude', 'lng', 'lon', 'Longitude'].forEach(key => {
+            if (props[key] !== undefined) {
+              log(`  ${key}: ${props[key]} (${typeof props[key]})`, 'success');
+            }
+          });
+        }
+        
+        let lat = null, lng = null;
+        
+        // Try each possible field name
+        for (const field of ['latitude', 'lat', 'Latitude', 'LAT', 'y', 'Y']) {
+          if (props[field] !== undefined && props[field] !== null) {
+            lat = parseFloat(props[field]);
+            break;
+          }
+        }
+        
+        for (const field of ['longitude', 'lng', 'lon', 'Longitude', 'LNG', 'LON', 'x', 'X']) {
+          if (props[field] !== undefined && props[field] !== null) {
+            lng = parseFloat(props[field]);
+            break;
+          }
+        }
+        
+        if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+          normalizedFeatures.push({
+            ...feature,
+            geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            }
+          });
+          stats.extracted++;
+        } else {
+          stats.failed++;
+        }
+      }
+      
+      log(`\n--- Normalization Results ---`, 'info');
+      log(`Native geometry: ${stats.native}`, stats.native > 0 ? 'success' : '');
+      log(`Extracted from properties: ${stats.extracted}`, stats.extracted > 0 ? 'success' : '');
+      log(`Failed (no coords): ${stats.failed}`, stats.failed > 0 ? 'error' : '');
+      log(`\nTotal usable features: ${normalizedFeatures.length}`, normalizedFeatures.length > 0 ? 'success' : 'error');
+      
+      if (normalizedFeatures.length > 0) {
+        const f = normalizedFeatures[0];
+        log(`\n--- Sample normalized feature ---`, 'info');
+        log(`Geometry: ${JSON.stringify(f.geometry)}`);
+      }
+    };
+    
+    window.testNearest = async function() {
+      clear();
+      log(`\n===== TEST 3: Nearest Neighbor =====\n`, 'info');
+      
+      if (!normalizedFeatures.length) {
+        log('❌ Run Tests 1 & 2 first', 'error');
+        return;
+      }
+      
+      try {
+        // Get current viewport center
+        const vp = await felt.getViewport();
+        const center = vp.center;
+        log(`📍 Viewport center: ${center.latitude.toFixed(4)}, ${center.longitude.toFixed(4)}`);
+        
+        log('\nCreating Turf.js center point...', 'info');
+        const centerPoint = turf.point([center.longitude, center.latitude]);
+        log(`✅ Center point: ${JSON.stringify(centerPoint.geometry.coordinates)}`);
+        
+        log(`\nCalculating distances for ${normalizedFeatures.length} features...`, 'info');
+        
+        const withDistances = [];
+        let errors = 0;
+        
+        for (const feature of normalizedFeatures) {
+          if (!feature.geometry || !feature.geometry.coordinates) {
+            errors++;
             continue;
           }
           
-          // Try to extract from properties
-          const props = f.properties || {};
-          let lat = props.latitude ?? props.lat ?? props.Latitude ?? props.LAT;
-          let lng = props.longitude ?? props.lng ?? props.lon ?? props.Longitude ?? props.LNG;
-          
-          log(`Feature ${f.id}: lat=${lat}, lng=${lng}`, lat && lng ? 'success' : 'warn');
-          
-          if (lat !== undefined && lng !== undefined) {
-            lat = parseFloat(lat);
-            lng = parseFloat(lng);
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              withExtractedGeom++;
-              normalized.push({
-                ...f,
-                geometry: { type: 'Point', coordinates: [lng, lat] }
-              });
-              continue;
-            }
-          }
-          
-          noGeom++;
-        }
-        
-        log('\n--- Results ---', 'info');
-        log(`Native geometry: ${withNativeGeom}`, withNativeGeom > 0 ? 'success' : '');
-        log(`Extracted from lat/lng: ${withExtractedGeom}`, withExtractedGeom > 0 ? 'success' : '');
-        log(`No geometry: ${noGeom}`, noGeom > 0 ? 'error' : 'success');
-        
-        if (normalized.length > 0) {
-          const sample = normalized[0];
-          log('\n--- Sample normalized feature ---', 'info');
-          log(`Geometry: ${JSON.stringify(sample.geometry)}`);
-          
-          window.normalizedFeatures = normalized;
-          log('\n✓ Normalized features saved to window.normalizedFeatures', 'success');
-        }
-        
-      } catch (e) {
-        log('✗ Normalization test failed: ' + e.message, 'error');
-        console.error(e);
-      }
-    };
-    
-    // Test 3: Nearest
-    window.testNearest = async () => {
-      const layerId = document.getElementById('layer-select').value;
-      if (!layerId) { log('Please select a layer first', 'error'); return; }
-      
-      log('\n═══ TEST: Nearest Neighbor ═══', 'info');
-      log(`Center: ${viewport.center.latitude.toFixed(4)}, ${viewport.center.longitude.toFixed(4)}`);
-      
-      try {
-        // Get and normalize features
-        const result = await felt.getFeatures({ layerId });
-        const features = (result?.features || []).map(f => {
-          if (f.geometry?.coordinates) return f;
-          const props = f.properties || {};
-          const lat = parseFloat(props.latitude ?? props.lat);
-          const lng = parseFloat(props.longitude ?? props.lng);
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return { ...f, geometry: { type: 'Point', coordinates: [lng, lat] } };
-          }
-          return f;
-        }).filter(f => f.geometry?.coordinates);
-        
-        log(`Features with geometry: ${features.length}`);
-        
-        if (features.length === 0) {
-          log('✗ No features with geometry!', 'error');
-          return;
-        }
-        
-        // Calculate distances
-        const centerPoint = turf.point([viewport.center.longitude, viewport.center.latitude]);
-        log(`Center point: ${JSON.stringify(centerPoint.geometry.coordinates)}`);
-        
-        const withDistances = features.map(f => {
           try {
-            const dist = turf.distance(centerPoint, turf.point(f.geometry.coordinates), { units: 'kilometers' });
-            return { ...f, distance: dist };
+            const featurePoint = turf.point(feature.geometry.coordinates);
+            const distance = turf.distance(centerPoint, featurePoint, { units: 'kilometers' });
+            withDistances.push({
+              id: feature.id,
+              name: feature.properties?.place || feature.properties?.title || feature.id?.substring(0, 8),
+              coords: feature.geometry.coordinates,
+              distance: distance
+            });
           } catch (e) {
-            log(`Distance calc failed for feature: ${e.message}`, 'warn');
-            return null;
+            errors++;
           }
-        }).filter(Boolean).sort((a, b) => a.distance - b.distance);
+        }
+        
+        log(`\n✅ Calculated distances for ${withDistances.length} features`, 'success');
+        if (errors > 0) log(`⚠️ ${errors} features had errors`, 'warn');
+        
+        // Sort and get top 5
+        withDistances.sort((a, b) => a.distance - b.distance);
+        const nearest5 = withDistances.slice(0, 5);
         
         log(`\n--- 5 Nearest Features ---`, 'info');
-        withDistances.slice(0, 5).forEach((f, i) => {
-          const name = f.properties?.place || f.properties?.title || f.properties?.acq_date || f.id;
-          log(`${i+1}. ${name} - ${f.distance.toFixed(1)} km`, 'success');
+        nearest5.forEach((f, i) => {
+          log(`${i+1}. ${f.name} - ${f.distance.toFixed(2)} km away`, 'success');
+          log(`   Coords: [${f.coords[0].toFixed(4)}, ${f.coords[1].toFixed(4)}]`);
         });
         
       } catch (e) {
-        log('✗ Nearest test failed: ' + e.message, 'error');
+        log(`\n❌ Error: ${e.message}`, 'error');
         console.error(e);
       }
     };
     
-    // Test 4: Buffer
-    window.testBuffer = async () => {
-      const layerId = document.getElementById('layer-select').value;
-      if (!layerId) { log('Please select a layer first', 'error'); return; }
+    window.testBuffer = async function() {
+      clear();
+      log(`\n===== TEST 4: Buffer Analysis =====\n`, 'info');
       
-      log('\n═══ TEST: Buffer Analysis (500km) ═══', 'info');
-      log(`Center: ${viewport.center.latitude.toFixed(4)}, ${viewport.center.longitude.toFixed(4)}`);
+      if (!normalizedFeatures.length) {
+        log('❌ Run Tests 1 & 2 first', 'error');
+        return;
+      }
       
       try {
-        const centerPoint = turf.point([viewport.center.longitude, viewport.center.latitude]);
-        const buffer = turf.buffer(centerPoint, 500, { units: 'kilometers' });
-        log(`✓ Buffer created with ${buffer.geometry.coordinates[0].length} vertices`, 'success');
+        const vp = await felt.getViewport();
+        const center = vp.center;
+        log(`📍 Center: ${center.latitude.toFixed(4)}, ${center.longitude.toFixed(4)}`);
         
-        // Get and normalize features
-        const result = await felt.getFeatures({ layerId });
-        const features = (result?.features || []).map(f => {
-          if (f.geometry?.coordinates) return f;
-          const props = f.properties || {};
-          const lat = parseFloat(props.latitude ?? props.lat);
-          const lng = parseFloat(props.longitude ?? props.lng);
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return { ...f, geometry: { type: 'Point', coordinates: [lng, lat] } };
+        const centerPoint = turf.point([center.longitude, center.latitude]);
+        const radiusKm = 500; // 500km buffer
+        
+        log(`\nCreating ${radiusKm}km buffer...`, 'info');
+        const buffer = turf.buffer(centerPoint, radiusKm, { units: 'kilometers' });
+        log(`✅ Buffer created with ${buffer.geometry.coordinates[0].length} vertices`);
+        
+        log(`\nChecking ${normalizedFeatures.length} features...`, 'info');
+        
+        let inside = 0;
+        let outside = 0;
+        let errors = 0;
+        const featuresInBuffer = [];
+        
+        for (const feature of normalizedFeatures) {
+          if (!feature.geometry || !feature.geometry.coordinates) {
+            errors++;
+            continue;
           }
-          return f;
-        }).filter(f => f.geometry?.coordinates);
-        
-        log(`Features with geometry: ${features.length}`);
-        
-        // Find features in buffer
-        let inBuffer = 0;
-        for (const f of features) {
+          
           try {
-            if (turf.booleanPointInPolygon(turf.point(f.geometry.coordinates), buffer)) {
-              inBuffer++;
+            const point = turf.point(feature.geometry.coordinates);
+            if (turf.booleanPointInPolygon(point, buffer)) {
+              inside++;
+              featuresInBuffer.push(feature);
+            } else {
+              outside++;
             }
-          } catch (e) {}
+          } catch (e) {
+            errors++;
+          }
         }
         
-        log(`\n--- Results ---`, 'info');
-        log(`Features in 500km buffer: ${inBuffer} / ${features.length}`, 'success');
-        log(`Percentage: ${((inBuffer / features.length) * 100).toFixed(1)}%`);
+        log(`\n--- Buffer Results ---`, 'info');
+        log(`✅ Features inside ${radiusKm}km buffer: ${inside}`, 'success');
+        log(`   Features outside: ${outside}`);
+        if (errors > 0) log(`⚠️ Errors: ${errors}`, 'warn');
+        
+        if (featuresInBuffer.length > 0) {
+          log(`\n--- Sample features in buffer ---`, 'info');
+          featuresInBuffer.slice(0, 5).forEach((f, i) => {
+            const name = f.properties?.place || f.properties?.title || f.id?.substring(0, 8);
+            log(`${i+1}. ${name}`);
+          });
+        }
         
       } catch (e) {
-        log('✗ Buffer test failed: ' + e.message, 'error');
+        log(`\n❌ Error: ${e.message}`, 'error');
         console.error(e);
       }
     };
     
-    init();
+    // Pre-fill with the test map
+    document.getElementById('map-url').value = 'https://felt.com/map/Living-Earth-Animated-Pulse-Map-zH0ZvXraQTep7nfT1L4kSD';
   </script>
 </body>
 </html>
