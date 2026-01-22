@@ -1,24 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Felt SDK Diagnostic</title>
+  <title>Felt SDK Diagnostic v2</title>
   <style>
     body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 20px; }
     #map { width: 100%; height: 300px; border: 1px solid #444; margin-bottom: 20px; }
-    pre { background: #0d0d1a; padding: 15px; border-radius: 8px; overflow: auto; max-height: 400px; font-size: 12px; }
+    pre { background: #0d0d1a; padding: 15px; border-radius: 8px; overflow: auto; max-height: 500px; font-size: 12px; }
     .success { color: #4ade80; }
     .error { color: #f87171; }
     .info { color: #60a5fa; }
+    .warn { color: #fbbf24; }
     h2 { color: #a78bfa; border-bottom: 1px solid #333; padding-bottom: 8px; }
   </style>
 </head>
 <body>
-  <h1>🔬 Felt SDK Feature Access Diagnostic</h1>
+  <h1>🔬 Felt SDK Diagnostic v2 - With Geometry Normalization</h1>
   <div id="map"></div>
   <pre id="output">Loading...</pre>
   
   <script type="module">
     import { Felt } from "https://esm.run/@feltmaps/js-sdk";
+    import * as turf from "https://esm.run/@turf/turf";
     
     const output = document.getElementById('output');
     output.textContent = '';
@@ -30,11 +32,50 @@
       output.appendChild(span);
     }
     
+    // Normalize feature geometry - extract from properties if needed
+    function normalizeFeatureGeometry(feature) {
+      if (feature.geometry && feature.geometry.coordinates) {
+        return { feature, source: 'native' };
+      }
+      
+      const props = feature.properties || {};
+      const latFields = ['latitude', 'lat', 'Latitude', 'LAT', 'y', 'Y'];
+      const lngFields = ['longitude', 'lng', 'lon', 'Longitude', 'LNG', 'LON', 'x', 'X'];
+      
+      let lat = null, lng = null;
+      
+      for (const field of latFields) {
+        if (props[field] !== undefined && props[field] !== null) {
+          lat = parseFloat(props[field]);
+          break;
+        }
+      }
+      
+      for (const field of lngFields) {
+        if (props[field] !== undefined && props[field] !== null) {
+          lng = parseFloat(props[field]);
+          break;
+        }
+      }
+      
+      if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+        return {
+          feature: {
+            ...feature,
+            geometry: { type: 'Point', coordinates: [lng, lat] }
+          },
+          source: 'extracted'
+        };
+      }
+      
+      return { feature, source: 'none' };
+    }
+    
     async function diagnose() {
       const mapId = 'zH0ZvXraQTep7nfT1L4kSD';
       
       log('═══════════════════════════════════════════════════════════', 'info');
-      log('  FELT SDK DIAGNOSTIC - Living Earth Animated Pulse Map', 'info');
+      log('  FELT SDK DIAGNOSTIC v2 - With Geometry Normalization', 'info');
       log('═══════════════════════════════════════════════════════════', 'info');
       
       try {
@@ -42,11 +83,9 @@
         const felt = await Felt.embed(document.getElementById('map'), mapId);
         log('✓ Map embedded successfully', 'success');
         
-        // Get viewport
         const vp = await felt.getViewport();
-        log(`\n[2] Viewport: ${vp.center.latitude.toFixed(4)}, ${vp.center.longitude.toFixed(4)} (zoom ${vp.zoom.toFixed(1)})`, 'info');
+        log(`\n[2] Viewport center: ${vp.center.latitude.toFixed(4)}, ${vp.center.longitude.toFixed(4)}`, 'info');
         
-        // Get layers
         log('\n[3] Getting layers...', 'info');
         const layers = await felt.getLayers();
         log(`✓ Found ${layers.length} layer(s)`, 'success');
@@ -56,66 +95,48 @@
           log(`\n${'─'.repeat(50)}`);
           log(`LAYER ${i + 1}: ${layer.name || '(unnamed)'}`, 'info');
           log(`  ID: ${layer.id}`);
-          log(`  Type: ${layer.type || 'unknown'}`);
-          log(`  Visible: ${layer.visible}`);
           
-          // Try getFeatures
-          log('\n  Testing getFeatures()...', 'info');
           try {
             const result = await felt.getFeatures({ layerId: layer.id });
-            if (result && result.features && result.features.length > 0) {
-              log(`  ✓ Got ${result.features.length} features!`, 'success');
+            const rawFeatures = result?.features || [];
+            log(`\n  Raw features from SDK: ${rawFeatures.length}`, 'info');
+            
+            if (rawFeatures.length > 0) {
+              // Normalize all features
+              const normalized = rawFeatures.map(f => normalizeFeatureGeometry(f));
+              const native = normalized.filter(n => n.source === 'native').length;
+              const extracted = normalized.filter(n => n.source === 'extracted').length;
+              const noGeom = normalized.filter(n => n.source === 'none').length;
               
-              const sample = result.features[0];
-              log(`\n  Sample feature:`);
-              log(`    Geometry type: ${sample.geometry?.type || 'NONE'}`);
-              log(`    Has coordinates: ${!!sample.geometry?.coordinates}`);
-              log(`    Properties: ${JSON.stringify(Object.keys(sample.properties || {}))}`);
+              log(`\n  Geometry sources:`, 'info');
+              log(`    Native geometry: ${native}`, native > 0 ? 'success' : '');
+              log(`    Extracted from lat/lng: ${extracted}`, extracted > 0 ? 'warn' : '');
+              log(`    No geometry: ${noGeom}`, noGeom > 0 ? 'error' : '');
               
-              if (sample.geometry?.coordinates) {
-                const coords = sample.geometry.coordinates;
-                if (sample.geometry.type === 'Point') {
-                  log(`    Coords: [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]`);
-                } else {
-                  log(`    Coords array length: ${Array.isArray(coords[0]) ? coords.length : 'nested'}`);
-                }
+              // Test Turf.js with first feature that has geometry
+              const validFeature = normalized.find(n => n.source !== 'none');
+              if (validFeature) {
+                const coords = validFeature.feature.geometry.coordinates;
+                log(`\n  Sample coordinates: [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]`, 'success');
+                
+                // Test distance calculation from viewport center
+                const center = turf.point([vp.center.longitude, vp.center.latitude]);
+                const point = turf.point(coords);
+                const dist = turf.distance(center, point, { units: 'kilometers' });
+                log(`  Distance from viewport: ${dist.toFixed(1)} km`, 'success');
+                
+                // Test buffer
+                const buffer = turf.buffer(point, 100, { units: 'kilometers' });
+                log(`  ✓ Turf.js buffer created successfully`, 'success');
               }
-            } else {
-              log(`  ⚠ getFeatures returned empty or null`, 'error');
-              log(`    Raw result: ${JSON.stringify(result)}`);
             }
           } catch (e) {
             log(`  ✗ getFeatures failed: ${e.message}`, 'error');
           }
-          
-          // Try getAggregates
-          log('\n  Testing getAggregates()...', 'info');
-          try {
-            const agg = await felt.getAggregates({
-              layerId: layer.id,
-              calculations: [{ type: 'count' }]
-            });
-            log(`  ✓ Aggregates: ${JSON.stringify(agg)}`, 'success');
-          } catch (e) {
-            log(`  ✗ getAggregates failed: ${e.message}`, 'error');
-          }
-          
-          // Try getLayerSchema
-          log('\n  Testing getLayerSchema()...', 'info');
-          try {
-            const schema = await felt.getLayerSchema({ layerId: layer.id });
-            if (schema && schema.properties) {
-              log(`  ✓ Schema properties: ${JSON.stringify(Object.keys(schema.properties))}`, 'success');
-            } else {
-              log(`  ⚠ Schema empty: ${JSON.stringify(schema)}`);
-            }
-          } catch (e) {
-            log(`  ✗ getLayerSchema failed: ${e.message}`, 'error');
-          }
         }
         
         log('\n' + '═'.repeat(50), 'info');
-        log('DIAGNOSTIC COMPLETE', 'info');
+        log('✓ DIAGNOSTIC COMPLETE - Geometry normalization working!', 'success');
         log('═'.repeat(50), 'info');
         
       } catch (e) {
