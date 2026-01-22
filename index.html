@@ -1297,20 +1297,9 @@
         renderLayerList();
         updateAnalysisLayerSelect(); // Update analysis layer dropdown
         
-        // Get feature count from first visible layer
-        let totalFeatures = 0;
-        for (const layer of state.layers.slice(0, 3)) {
-          try {
-            const result = await state.felt.getAggregates({
-              layerId: layer.id,
-              calculations: ['count']
-            });
-            totalFeatures += result?.count || 0;
-          } catch (e) {
-            // Skip layers that don't support aggregates
-          }
-        }
-        document.getElementById('stat-features').textContent = formatNumber(totalFeatures);
+        // Get feature count from layers
+        let totalFeatures = state.layers.length;
+        document.getElementById('stat-features').textContent = formatNumber(totalFeatures) + ' layers';
       } catch (e) {
         console.log('Could not load layers:', e);
       }
@@ -2029,22 +2018,10 @@
         // Get all features
         const features = await getAllLayerFeatures(state.analysisLayer);
         
-        // Also try to get aggregate count from SDK
-        let sdkCount = null;
-        try {
-          const aggregates = await state.felt.getAggregates({
-            layerId: state.analysisLayer,
-            calculations: [{ type: 'count' }]
-          });
-          sdkCount = aggregates?.results?.[0]?.value;
-        } catch (e) {
-          console.log('Could not get aggregates:', e);
-        }
-        
         // Calculate statistics
         const stats = {
           type: 'stats',
-          featureCount: features.length || sdkCount || 'Unknown',
+          featureCount: features.length,
           geometryTypes: {},
           totalArea: 0,
           totalLength: 0,
